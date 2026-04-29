@@ -1,233 +1,245 @@
-//
-//  ViewController.m
-//  MyUltron2
-//
-//  Created by 魏根 on 2026/4/28.
-//
-
 #import "ViewController.h"
 
 #include <libimobiledevice/libimobiledevice.h>
 #include <libimobiledevice/lockdown.h>
-#include <libimobiledevice/house_arrest.h>
-#include <libimobiledevice/afc.h>
+#include <libimobiledevice/installation_proxy.h>
 #include <plist/plist.h>
 
 @implementation ViewController
 
-- (NSArray<NSString *> *)bootedIOSSimulators {
-    NSTask *task = [[NSTask alloc] init];
-    NSPipe *outputPipe = [NSPipe pipe];
-    NSPipe *errorPipe = [NSPipe pipe];
-
-    task.executableURL = [NSURL fileURLWithPath:@"/usr/bin/xcrun"];
-    task.arguments = @[@"simctl", @"list", @"devices", @"--json"];
-    task.standardOutput = outputPipe;
-    task.standardError = errorPipe;
-
-    NSError *launchError = nil;
-    if (![task launchAndReturnError:&launchError]) {
-        NSLog(@"⚠️ 模拟器检测失败: %@", launchError.localizedDescription);
-        return @[];
-    }
-
-    [task waitUntilExit];
-
-    NSData *outputData = [outputPipe.fileHandleForReading readDataToEndOfFile];
-    NSData *errorData = [errorPipe.fileHandleForReading readDataToEndOfFile];
-    if (task.terminationStatus != 0) {
-        NSString *errorOutput = [[NSString alloc] initWithData:errorData encoding:NSUTF8StringEncoding];
-        if (errorOutput.length > 0) {
-            NSLog(@"⚠️ 模拟器检测失败: %@", errorOutput);
-        }
-        return @[];
-    }
-    if (outputData.length == 0) {
-        return @[];
-    }
-
-    NSError *jsonError = nil;
-    NSDictionary *json = [NSJSONSerialization JSONObjectWithData:outputData options:0 error:&jsonError];
-    if (![json isKindOfClass:[NSDictionary class]]) {
-        if (jsonError != nil) {
-            NSLog(@"⚠️ 模拟器检测结果解析失败: %@", jsonError.localizedDescription);
-        }
-        return @[];
-    }
-
-    NSDictionary<NSString *, NSArray<NSDictionary *> *> *devicesByRuntime = json[@"devices"];
-    if (![devicesByRuntime isKindOfClass:[NSDictionary class]]) {
-        return @[];
-    }
-
-    NSMutableArray<NSString *> *simulators = [NSMutableArray array];
-    [devicesByRuntime enumerateKeysAndObjectsUsingBlock:^(NSString *runtime, NSArray<NSDictionary *> *devices, BOOL *stop) {
-        if (![runtime containsString:@"iOS"]) {
-            return;
-        }
-        for (NSDictionary *device in devices) {
-            if (![device isKindOfClass:[NSDictionary class]]) {
-                continue;
-            }
-            NSString *state = device[@"state"];
-            NSString *name = device[@"name"];
-            NSString *udid = device[@"udid"];
-            if ([state isEqualToString:@"Booted"] && name.length > 0 && udid.length > 0) {
-                [simulators addObject:[NSString stringWithFormat:@"%@ (%@)", name, udid]];
-            }
-        }
-    }];
-
-    return simulators;
-}
-
 - (void)viewDidLoad {
     [super viewDidLoad];
 
-    // Do any additional setup after loading the view.
-    
-    // 1. 同时检测已启动的 iOS 模拟器和 USB 连接的真机
-    NSArray<NSString *> *bootedSimulators = [self bootedIOSSimulators];
-    if (bootedSimulators.count > 0) {
-        NSLog(@"✅ 检测到 %lu 个已启动的 iOS 模拟器", (unsigned long)bootedSimulators.count);
-        for (NSString *simulator in bootedSimulators) {
-            NSLog(@"  Simulator: %@", simulator);
-        }
-    } else {
-        NSLog(@"ℹ️ 当前没有已启动的 iOS 模拟器");
-    }
+    self.deviceButton = [NSButton buttonWithTitle:@"连接设备" target:self action:@selector(showDeviceMenu:)];
+    self.deviceButton.frame = NSMakeRect(16, self.view.bounds.size.height - 44, 140, 32);
+    self.deviceButton.autoresizingMask = NSViewMaxXMargin | NSViewMinYMargin;
+    [self.view addSubview:self.deviceButton];
 
-    char **devices = NULL;
-    int dev_count = 0;
-    idevice_error_t err = idevice_get_device_list(&devices, &dev_count);
-    if (dev_count == 0) {
-        NSLog(@"❌ 未检测到已连接、已信任的 iOS 设备");
-        return;
-    }
-    if (err == IDEVICE_E_SUCCESS && dev_count > 0) {
-        NSLog(@"检测到已连接、已信任的 iOS 设备");
-    }
-    
-    const char *udid = devices[0];
-    NSLog(@"✅ 设备 UDID: %s", udid);
-
-    const char content[] = "Hello Mac Native AFC Demo\n\xe5\xb7\xb2\xe6\x88\x90\xe5\x8a\x9f\xe8\xaf\xbb\xe5\x86\x99iOS App\xe6\xb2\x99\xe7\x9b\x92";
-
-    // 2. 创建设备连接
-    idevice_t dev = NULL;
-    if (idevice_new_with_options(&dev, udid, IDEVICE_LOOKUP_USBMUX) != IDEVICE_E_SUCCESS) {
-        NSLog(@"❌ 设备连接失败");
-        idevice_device_list_free(devices);
-        return;
-    }
-
-    // 3. 握手 lockdownd 服务
-    lockdownd_client_t lckd = NULL;
-    if (lockdownd_client_new_with_handshake(dev, &lckd, "MacAFC_Demo") != LOCKDOWN_E_SUCCESS) {
-        NSLog(@"❌ Lockdown 握手失败，请解锁手机并重信电脑");
-        idevice_free(dev);
-        idevice_device_list_free(devices);
-        return;
-    }
-
-    // ===================== 配置你要访问的 App BundleID =====================
-    NSString *targetBundleID = @"com.tencent.xin"; // 替换为自签/调试App，AppStore应用不可访问
-    const char *bid = targetBundleID.UTF8String;
-
-    // 4. 启动 house_arrest 进入 App 私有沙盒
-    house_arrest_client_t ha = NULL;
-    afc_client_t afc = NULL;
-    lockdownd_service_descriptor_t service = NULL;
-    if (lockdownd_start_service(lckd, HOUSE_ARREST_SERVICE_NAME, &service) != LOCKDOWN_E_SUCCESS || !service) {
-        NSLog(@"❌ House Arrest 服务启动失败");
-        goto cleanup;
-    }
-
-    if (house_arrest_client_new(dev, service, &ha) != HOUSE_ARREST_E_SUCCESS) {
-        NSLog(@"❌ House Arrest 客户端创建失败");
-        goto cleanup;
-    }
-
-    if (house_arrest_send_command(ha, "VendDocuments", bid) != HOUSE_ARREST_E_SUCCESS) {
-        NSLog(@"❌ 沙盒访问命令发送失败");
-        goto cleanup;
-    }
-
-    plist_t result = NULL;
-    if (house_arrest_get_result(ha, &result) != HOUSE_ARREST_E_SUCCESS || !result) {
-        NSLog(@"❌ 沙盒访问结果读取失败");
-        goto cleanup;
-    }
-
-    plist_t errorNode = plist_dict_get_item(result, "Error");
-    if (errorNode != NULL) {
-        char *errorText = NULL;
-        plist_get_string_val(errorNode, &errorText);
-        NSLog(@"❌ 沙盒访问失败: %s", errorText ?: "unknown error");
-        free(errorText);
-        plist_free(result);
-        goto cleanup;
-    }
-    plist_free(result);
-    NSLog(@"✅ 成功进入 App 沙盒: %@", targetBundleID);
-
-    // 5. 从 house_arrest 挂载 AFC 文件通道
-    if (afc_client_new_from_house_arrest_client(ha, &afc) != AFC_E_SUCCESS) {
-        NSLog(@"❌ AFC 文件通道初始化失败");
-        goto cleanup;
-    }
-
-    // 6. 列出沙盒根目录
-    char **dirList = NULL;
-    afc_read_directory(afc, "/", &dirList);
-    NSLog(@"\n📁 沙盒根目录文件:");
-    for (int i = 0; dirList[i]; i++) {
-        NSLog(@"  %s", dirList[i]);
-    }
-    afc_dictionary_free(dirList);
-
-    // 7. 写入测试文件到 Documents
-    const char *writePath = "/Documents/mac_test.txt";
-    uint64_t fileHandle = 0;
-
-    afc_file_open(afc, writePath, AFC_FOPEN_WRONLY, &fileHandle);
-    if (fileHandle != 0) {
-        uint32_t writeLen = 0;
-        afc_file_write(afc, fileHandle, (void *)content, (uint32_t)strlen(content), &writeLen);
-        afc_file_close(afc, fileHandle);
-        NSLog(@"\n✅ 文件写入成功: %s", writePath);
-    } else {
-        NSLog(@"\n❌ 文件写入失败");
-    }
-
-    // 8. 读取刚刚写入的文件
-    afc_file_open(afc, writePath, AFC_FOPEN_RDONLY, &fileHandle);
-    if (fileHandle != 0) {
-        char buffer[2048] = {0};
-        uint32_t readLen = 0;
-        afc_file_read(afc, fileHandle, buffer, sizeof(buffer)-1, &readLen);
-        NSLog(@"\n📖 读取文件内容:\n%s", buffer);
-        afc_file_close(afc, fileHandle);
-    }
-
-    // 资源释放
-    cleanup:
-        if (afc) afc_client_free(afc);
-        if (ha) house_arrest_client_free(ha);
-        if (service) lockdownd_service_descriptor_free(service);
-        if (lckd) lockdownd_client_free(lckd);
-        if (dev) idevice_free(dev);
-        idevice_device_list_free(devices);
-
-        NSLog(@"\n🏁 全部流程结束");
+    self.appButton = [NSButton buttonWithTitle:@"选择App" target:self action:@selector(showAppMenu:)];
+    self.appButton.frame = NSMakeRect(164, self.view.bounds.size.height - 44, 140, 32);
+    self.appButton.autoresizingMask = NSViewMaxXMargin | NSViewMinYMargin;
+    [self.view addSubview:self.appButton];
 }
 
+- (void)showDeviceMenu:(NSButton *)sender {
+    NSMenu *menu = [[NSMenu alloc] init];
+
+    // 模拟器
+    NSArray<NSDictionary *> *sims = [self bootedSimulators];
+    for (NSDictionary *sim in sims) {
+        NSMenuItem *item = [[NSMenuItem alloc] initWithTitle:sim[@"name"] action:@selector(selectDevice:) keyEquivalent:@""];
+        item.target = self;
+        item.representedObject = sim;
+        [menu addItem:item];
+    }
+
+    // 真机
+    char **udids = NULL;
+    int count = 0;
+    if (idevice_get_device_list(&udids, &count) == IDEVICE_E_SUCCESS && count > 0) {
+        if (sims.count > 0) [menu addItem:[NSMenuItem separatorItem]];
+        for (int i = 0; i < count; i++) {
+            NSString *udid = @(udids[i]);
+            NSString *name = [self deviceNameForUDID:udids[i]] ?: udid;
+            NSMenuItem *item = [[NSMenuItem alloc] initWithTitle:name action:@selector(selectDevice:) keyEquivalent:@""];
+            item.target = self;
+            item.representedObject = @{@"name": name, @"udid": udid, @"simulator": @NO};
+            [menu addItem:item];
+        }
+        idevice_device_list_free(udids);
+    }
+
+    if (menu.numberOfItems == 0) {
+        [menu addItemWithTitle:@"未检测到设备" action:nil keyEquivalent:@""];
+    }
+
+    [menu popUpMenuPositioningItem:nil atLocation:NSMakePoint(0, sender.bounds.size.height) inView:sender];
+}
+
+- (void)selectDevice:(NSMenuItem *)item {
+    NSDictionary *info = item.representedObject;
+    self.deviceButton.title = info[@"name"];
+    self.selectedUDID = info[@"udid"];
+    self.selectedIsSimulator = [info[@"simulator"] boolValue];
+    self.appButton.title = @"选择App";
+}
+
+- (void)showAppMenu:(NSButton *)sender {
+    if (!self.selectedUDID) {
+        NSAlert *alert = [[NSAlert alloc] init];
+        alert.messageText = @"请先选择设备";
+        [alert runModal];
+        return;
+    }
+
+    NSMenu *menu = [[NSMenu alloc] init];
+    NSArray<NSDictionary *> *apps = self.selectedIsSimulator
+        ? [self appsForSimulator:self.selectedUDID]
+        : [self appsForDevice:self.selectedUDID];
+
+    for (NSDictionary *app in apps) {
+        NSMenuItem *item = [[NSMenuItem alloc] initWithTitle:app[@"name"] action:@selector(selectApp:) keyEquivalent:@""];
+        item.target = self;
+        item.representedObject = app;
+        [menu addItem:item];
+    }
+
+    if (menu.numberOfItems == 0) {
+        [menu addItemWithTitle:@"未找到App" action:nil keyEquivalent:@""];
+    }
+
+    [menu popUpMenuPositioningItem:nil atLocation:NSMakePoint(0, sender.bounds.size.height) inView:sender];
+}
+
+- (void)selectApp:(NSMenuItem *)item {
+    NSDictionary *app = item.representedObject;
+    self.appButton.title = app[@"name"];
+    [self launchApp:app[@"bundleID"] onDevice:self.selectedUDID isSimulator:self.selectedIsSimulator];
+}
+
+#pragma mark - Device helpers
+
+- (NSArray<NSDictionary *> *)bootedSimulators {
+    NSTask *task = [[NSTask alloc] init];
+    task.executableURL = [NSURL fileURLWithPath:@"/usr/bin/xcrun"];
+    task.arguments = @[@"simctl", @"list", @"devices", @"--json"];
+    NSPipe *pipe = [NSPipe pipe];
+    task.standardOutput = pipe;
+    task.standardError = [NSPipe pipe];
+    if (![task launchAndReturnError:nil]) return @[];
+    [task waitUntilExit];
+
+    NSData *data = [pipe.fileHandleForReading readDataToEndOfFile];
+    NSDictionary *json = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
+    NSDictionary *devicesByRuntime = json[@"devices"];
+    if (![devicesByRuntime isKindOfClass:[NSDictionary class]]) return @[];
+
+    NSMutableArray *result = [NSMutableArray array];
+    [devicesByRuntime enumerateKeysAndObjectsUsingBlock:^(NSString *runtime, NSArray *devices, BOOL *stop) {
+        if (![runtime containsString:@"iOS"]) return;
+        for (NSDictionary *d in devices) {
+            if (![d[@"state"] isEqualToString:@"Booted"]) continue;
+            NSString *name = d[@"name"];
+            NSString *udid = d[@"udid"];
+            if (name && udid) {
+                [result addObject:@{@"name": name, @"udid": udid, @"simulator": @YES}];
+            }
+        }
+    }];
+    return result;
+}
+
+- (NSString *)deviceNameForUDID:(const char *)udid {
+    idevice_t dev = NULL;
+    if (idevice_new_with_options(&dev, udid, IDEVICE_LOOKUP_USBMUX) != IDEVICE_E_SUCCESS) return nil;
+    lockdownd_client_t lckd = NULL;
+    NSString *name = nil;
+    if (lockdownd_client_new_with_handshake(dev, &lckd, "DeviceName") == LOCKDOWN_E_SUCCESS) {
+        plist_t val = NULL;
+        if (lockdownd_get_value(lckd, NULL, "DeviceName", &val) == LOCKDOWN_E_SUCCESS && val) {
+            char *str = NULL;
+            plist_get_string_val(val, &str);
+            if (str) { name = @(str); free(str); }
+            plist_free(val);
+        }
+        lockdownd_client_free(lckd);
+    }
+    idevice_free(dev);
+    return name;
+}
+
+#pragma mark - App helpers
+
+- (NSArray<NSDictionary *> *)appsForSimulator:(NSString *)udid {
+    NSTask *task = [[NSTask alloc] init];
+    task.executableURL = [NSURL fileURLWithPath:@"/usr/bin/xcrun"];
+    task.arguments = @[@"simctl", @"listapps", udid];
+    NSPipe *pipe = [NSPipe pipe];
+    task.standardOutput = pipe;
+    task.standardError = [NSPipe pipe];
+    if (![task launchAndReturnError:nil]) return @[];
+    [task waitUntilExit];
+
+    NSData *data = [pipe.fileHandleForReading readDataToEndOfFile];
+    NSDictionary *plistDict = [NSPropertyListSerialization propertyListWithData:data options:0 format:nil error:nil];
+    if (![plistDict isKindOfClass:[NSDictionary class]]) return @[];
+
+    NSMutableArray *apps = [NSMutableArray array];
+    [plistDict enumerateKeysAndObjectsUsingBlock:^(NSString *bundleID, NSDictionary *info, BOOL *stop) {
+        NSString *name = info[@"CFBundleDisplayName"] ?: info[@"CFBundleName"] ?: bundleID;
+        [apps addObject:@{@"name": name, @"bundleID": bundleID}];
+    }];
+    [apps sortUsingDescriptors:@[[NSSortDescriptor sortDescriptorWithKey:@"name" ascending:YES]]];
+    return apps;
+}
+
+- (NSArray<NSDictionary *> *)appsForDevice:(NSString *)udid {
+    idevice_t dev = NULL;
+    if (idevice_new_with_options(&dev, udid.UTF8String, IDEVICE_LOOKUP_USBMUX) != IDEVICE_E_SUCCESS) return @[];
+
+    lockdownd_client_t lckd = NULL;
+    NSMutableArray *apps = [NSMutableArray array];
+    if (lockdownd_client_new_with_handshake(dev, &lckd, "AppList") != LOCKDOWN_E_SUCCESS) {
+        idevice_free(dev);
+        return @[];
+    }
+
+    lockdownd_service_descriptor_t svc = NULL;
+    instproxy_client_t ip = NULL;
+    if (lockdownd_start_service(lckd, INSTPROXY_SERVICE_NAME, &svc) == LOCKDOWN_E_SUCCESS && svc) {
+        if (instproxy_client_new(dev, svc, &ip) == INSTPROXY_E_SUCCESS) {
+            plist_t opts = instproxy_client_options_new();
+            instproxy_client_options_add(opts, "ApplicationType", "User", NULL);
+            plist_t result = NULL;
+            if (instproxy_browse(ip, opts, &result) == INSTPROXY_E_SUCCESS && result) {
+                uint32_t n = plist_array_get_size(result);
+                for (uint32_t i = 0; i < n; i++) {
+                    plist_t app = plist_array_get_item(result, i);
+                    plist_t nameNode = plist_dict_get_item(app, "CFBundleDisplayName");
+                    if (!nameNode) nameNode = plist_dict_get_item(app, "CFBundleName");
+                    plist_t bidNode = plist_dict_get_item(app, "CFBundleIdentifier");
+                    if (!nameNode || !bidNode) continue;
+                    char *nameStr = NULL, *bidStr = NULL;
+                    plist_get_string_val(nameNode, &nameStr);
+                    plist_get_string_val(bidNode, &bidStr);
+                    if (nameStr && bidStr) {
+                        [apps addObject:@{@"name": @(nameStr), @"bundleID": @(bidStr)}];
+                    }
+                    free(nameStr); free(bidStr);
+                }
+                plist_free(result);
+            }
+            plist_free(opts);
+            instproxy_client_free(ip);
+        }
+        lockdownd_service_descriptor_free(svc);
+    }
+    lockdownd_client_free(lckd);
+    idevice_free(dev);
+    [apps sortUsingDescriptors:@[[NSSortDescriptor sortDescriptorWithKey:@"name" ascending:YES]]];
+    return apps;
+}
+
+#pragma mark - Launch
+
+- (void)launchApp:(NSString *)bundleID onDevice:(NSString *)udid isSimulator:(BOOL)isSimulator {
+    NSTask *task = [[NSTask alloc] init];
+    task.executableURL = [NSURL fileURLWithPath:@"/usr/bin/xcrun"];
+    if (isSimulator) {
+        task.arguments = @[@"simctl", @"launch", udid, bundleID];
+    } else {
+        task.arguments = @[@"devicectl", @"device", @"process", @"launch", @"--device", udid, bundleID];
+    }
+    task.standardOutput = [NSPipe pipe];
+    task.standardError = [NSPipe pipe];
+    NSError *err = nil;
+    if (![task launchAndReturnError:&err]) {
+        NSLog(@"启动失败: %@", err.localizedDescription);
+    }
+}
 
 - (void)setRepresentedObject:(id)representedObject {
     [super setRepresentedObject:representedObject];
-
-    // Update the view, if already loaded.
 }
-
 
 @end

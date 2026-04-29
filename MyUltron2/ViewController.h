@@ -9,6 +9,10 @@
 
 @interface ViewController : NSViewController
 
+@property (nonatomic, strong) NSButton *deviceButton;
+@property (nonatomic, strong) NSButton *appButton;
+@property (nonatomic, copy) NSString *selectedUDID;
+@property (nonatomic, assign) BOOL selectedIsSimulator;
 
 @end
 
