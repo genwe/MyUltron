@@ -5,6 +5,10 @@
 #include <libimobiledevice/installation_proxy.h>
 #include <plist/plist.h>
 
+@interface ViewController () <NSTableViewDataSource, NSTableViewDelegate>
+@property (nonatomic, strong) NSArray<NSString *> *featureItems;
+@end
+
 @implementation ViewController
 
 - (void)viewDidLoad {
@@ -19,6 +23,35 @@
     self.appButton.frame = NSMakeRect(164, self.view.bounds.size.height - 44, 140, 32);
     self.appButton.autoresizingMask = NSViewMaxXMargin | NSViewMinYMargin;
     [self.view addSubview:self.appButton];
+
+    self.featureItems = @[
+        @"消息推送",@"设备截屏", @"沙盒管理",@"MMKV数据", @"UserDefault数据", @"数据库",
+        @"网络监控", @"日志监控", @"埋点监控",
+        @"IM会话监控", @"路由校验", @"环境切换",
+        @"崩溃日志", @"热修复", @"灰度任务", @"编解码", @"解析xlog"
+    ];
+
+    CGFloat listTop = self.view.bounds.size.height - 52;
+    NSScrollView *scrollView = [[NSScrollView alloc] initWithFrame:NSMakeRect(16, 20, 200, listTop - 20)];
+    scrollView.autoresizingMask = NSViewMaxXMargin | NSViewHeightSizable | NSViewMinYMargin;
+    scrollView.borderType = NSBezelBorder;
+    scrollView.hasVerticalScroller = YES;
+
+    NSTableView *tableView = [[NSTableView alloc] initWithFrame:scrollView.bounds];
+    tableView.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
+
+    NSTableColumn *column = [[NSTableColumn alloc] initWithIdentifier:@"feature"];
+    column.title = @"功能列表";
+    column.width = scrollView.bounds.size.width;
+    [tableView addTableColumn:column];
+    tableView.headerView = nil;
+    tableView.dataSource = self;
+    tableView.delegate = self;
+
+    scrollView.documentView = tableView;
+    self.scrollView = scrollView;
+    self.tableView = tableView;
+    [self.view addSubview:scrollView];
 }
 
 - (void)showDeviceMenu:(NSButton *)sender {
@@ -61,7 +94,7 @@
     self.deviceButton.title = info[@"name"];
     self.selectedUDID = info[@"udid"];
     self.selectedIsSimulator = [info[@"simulator"] boolValue];
-    self.appButton.title = @"选择App";
+    self.appButton.title = @"请选择应用";
 }
 
 - (void)showAppMenu:(NSButton *)sender {
@@ -240,6 +273,69 @@
 
 - (void)setRepresentedObject:(id)representedObject {
     [super setRepresentedObject:representedObject];
+}
+
+#pragma mark - Table view
+
+- (NSInteger)numberOfRowsInTableView:(NSTableView *)tableView {
+    return self.featureItems.count;
+}
+
+- (id)tableView:(NSTableView *)tableView objectValueForTableColumn:(NSTableColumn *)tableColumn row:(NSInteger)row {
+    return self.featureItems[row];
+}
+
+- (void)tableViewSelectionDidChange:(NSNotification *)notification {
+    NSInteger row = self.tableView.selectedRow;
+    if (row < 0 || row >= (NSInteger)self.featureItems.count) return;
+
+    if (!self.selectedUDID) {
+        [self showToast:@"请选择连接设备"];
+        return;
+    }
+    if ([self.appButton.title isEqualToString:@"请选择应用"]) {
+        [self showToast:@"请选择应用"];
+        return;
+    }
+
+    NSLog(@"[Ultron] 选中功能: %@", self.featureItems[row]);
+}
+
+#pragma mark - Toast
+
+- (void)showToast:(NSString *)message {
+    NSTextField *toast = [[NSTextField alloc] initWithFrame:NSMakeRect(0, 0, 180, 28)];
+    toast.stringValue = message;
+    toast.editable = NO;
+    toast.bordered = NO;
+    toast.selectable = NO;
+    toast.alignment = NSTextAlignmentCenter;
+    toast.textColor = [NSColor whiteColor];
+    toast.backgroundColor = [NSColor colorWithWhite:0 alpha:0.75];
+    toast.wantsLayer = YES;
+    toast.layer.cornerRadius = 6;
+    toast.layer.masksToBounds = YES;
+    toast.font = [NSFont systemFontOfSize:13];
+
+    NSRect bounds = self.scrollView.bounds;
+    toast.frame = NSMakeRect((bounds.size.width - 180) / 2, bounds.size.height - 40, 180, 28);
+    toast.autoresizingMask = NSViewMinXMargin | NSViewMaxXMargin | NSViewMinYMargin;
+    toast.alphaValue = 0;
+    [self.scrollView addSubview:toast];
+
+    [NSAnimationContext runAnimationGroup:^(NSAnimationContext *context) {
+        context.duration = 0.25;
+        toast.animator.alphaValue = 1.0;
+    } completionHandler:^{
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            [NSAnimationContext runAnimationGroup:^(NSAnimationContext *context) {
+                context.duration = 0.5;
+                toast.animator.alphaValue = 0;
+            } completionHandler:^{
+                [toast removeFromSuperview];
+            }];
+        });
+    }];
 }
 
 @end
