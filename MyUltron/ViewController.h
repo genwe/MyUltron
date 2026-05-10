@@ -13,6 +13,7 @@
 @property (nonatomic, strong) NSButton *appButton;
 @property (nonatomic, strong) NSScrollView *scrollView;
 @property (nonatomic, strong) NSTableView *tableView;
+@property (nonatomic, strong) NSView *containerView;
 @property (nonatomic, copy) NSString *selectedUDID;
 @property (nonatomic, assign) BOOL selectedIsSimulator;
 

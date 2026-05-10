@@ -1,5 +1,23 @@
 #import "ViewController.h"
 
+#import "Features/MessagePushViewController.h"
+#import "Features/DeviceScreenshotViewController.h"
+#import "Features/SandboxViewController.h"
+#import "Features/MMKVViewController.h"
+#import "Features/UserDefaultsViewController.h"
+#import "Features/DatabaseViewController.h"
+#import "Features/NetworkMonitorViewController.h"
+#import "Features/LogMonitorViewController.h"
+#import "Features/AnalyticsMonitorViewController.h"
+#import "Features/IMSessionViewController.h"
+#import "Features/RouteValidationViewController.h"
+#import "Features/EnvironmentSwitchViewController.h"
+#import "Features/CrashLogViewController.h"
+#import "Features/HotfixViewController.h"
+#import "Features/GrayscaleTaskViewController.h"
+#import "Features/CodecViewController.h"
+#import "Features/XlogParserViewController.h"
+
 #include <libimobiledevice/libimobiledevice.h>
 #include <libimobiledevice/lockdown.h>
 #include <libimobiledevice/installation_proxy.h>
@@ -7,6 +25,7 @@
 
 @interface ViewController () <NSTableViewDataSource, NSTableViewDelegate>
 @property (nonatomic, strong) NSArray<NSString *> *featureItems;
+@property (nonatomic, strong) NSViewController *currentFeatureVC;
 @end
 
 @implementation ViewController
@@ -52,6 +71,15 @@
     self.scrollView = scrollView;
     self.tableView = tableView;
     [self.view addSubview:scrollView];
+
+    NSRect containerFrame = NSMakeRect(232, 20, self.view.bounds.size.width - 232 - 16, listTop - 20);
+    self.containerView = [[NSView alloc] initWithFrame:containerFrame];
+    self.containerView.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable | NSViewMinYMargin;
+    self.containerView.wantsLayer = YES;
+    self.containerView.layer.backgroundColor = [[NSColor colorWithWhite:0.96 alpha:1.0] CGColor];
+    self.containerView.layer.borderWidth = 1;
+    self.containerView.layer.borderColor = [[NSColor lightGrayColor] CGColor];
+    [self.view addSubview:self.containerView];
 }
 
 - (void)showDeviceMenu:(NSButton *)sender {
@@ -299,6 +327,43 @@
     }
 
     NSLog(@"[Ultron] 选中功能: %@", self.featureItems[row]);
+    [self showFeatureAtIndex:row];
+}
+
+- (void)showFeatureAtIndex:(NSInteger)index {
+    if (self.currentFeatureVC) {
+        [self.currentFeatureVC.view removeFromSuperview];
+        [self.currentFeatureVC removeFromParentViewController];
+        self.currentFeatureVC = nil;
+    }
+
+    NSArray *classes = @[
+        [MessagePushViewController class],
+        [DeviceScreenshotViewController class],
+        [SandboxViewController class],
+        [MMKVViewController class],
+        [UserDefaultsViewController class],
+        [DatabaseViewController class],
+        [NetworkMonitorViewController class],
+        [LogMonitorViewController class],
+        [AnalyticsMonitorViewController class],
+        [IMSessionViewController class],
+        [RouteValidationViewController class],
+        [EnvironmentSwitchViewController class],
+        [CrashLogViewController class],
+        [HotfixViewController class],
+        [GrayscaleTaskViewController class],
+        [CodecViewController class],
+        [XlogParserViewController class]
+    ];
+
+    Class cls = classes[index];
+    NSViewController *vc = [[cls alloc] init];
+    [self addChildViewController:vc];
+    vc.view.frame = self.containerView.bounds;
+    vc.view.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
+    [self.containerView addSubview:vc.view];
+    self.currentFeatureVC = vc;
 }
 
 #pragma mark - Toast
