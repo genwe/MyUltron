@@ -406,9 +406,15 @@
     NSString *type = dict[@"messageType"];
     NSLog(@"[MyUltron] ← messageType: %@", type);
 
-    // Forward to the active feature view controller if it handles messages
     if ([self.currentFeatureVC respondsToSelector:@selector(didReceiveMessage:)]) {
         [self.currentFeatureVC didReceiveMessage:dict];
+    }
+}
+
+- (void)client:(MyUltronClient *)client didReceiveBinaryData:(NSData *)data {
+    if ([self.currentFeatureVC respondsToSelector:@selector(didReceiveBinaryData:)]) {
+        [self.currentFeatureVC performSelector:@selector(didReceiveBinaryData:)
+                                    withObject:data];
     }
 }
 

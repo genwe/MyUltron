@@ -27,6 +27,9 @@ NS_ASSUME_NONNULL_BEGIN
 /// TCP connection lost.
 - (void)clientDidDisconnect:(MyUltronClient *)client;
 
+/// Raw binary data received from the server.
+- (void)client:(MyUltronClient *)client didReceiveBinaryData:(NSData *)data;
+
 @end
 
 // MARK: - Client

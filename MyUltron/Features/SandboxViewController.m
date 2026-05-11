@@ -56,6 +56,8 @@ static NSString * const kTypeSandboxDelete    = @"sandboxDelete";
 @property (nonatomic, strong) NSMutableArray<SandboxEntry *> *entries;
 @property (nonatomic, strong) NSMutableArray<NSString *>    *pathHistory;
 @property (nonatomic, assign) BOOL               loadingRequested;
+@property (nonatomic, copy)   NSString          *pendingDownloadName;
+@property (nonatomic, copy)   NSString          *pendingDownloadDir;
 
 @end
 
@@ -359,21 +361,22 @@ static NSString * const kTypeSandboxDelete    = @"sandboxDelete";
     NSIndexSet *rows = self.tableView.selectedRowIndexes;
     if (rows.count == 0) return;
 
-    NSOpenPanel *panel = [NSOpenPanel openPanel];
-    panel.canChooseFiles          = NO;
-    panel.canChooseDirectories    = YES;
-    panel.canCreateDirectories    = YES;
-    panel.allowsMultipleSelection = NO;
-    panel.prompt                  = @"保存到此目录";
+    // Pick a single entry for simplicity
+    SandboxEntry *e = self.entries[rows.firstIndex];
+
+    NSSavePanel *panel = [NSSavePanel savePanel];
+    panel.nameFieldStringValue = e.name;
     [panel beginSheetModalForWindow:self.view.window completionHandler:^(NSModalResponse result) {
         if (result != NSModalResponseOK) return;
-        NSString *localDir = panel.URL.path;
-        [rows enumerateIndexesUsingBlock:^(NSUInteger idx, BOOL *stop) {
-            SandboxEntry *e = self.entries[idx];
-            NSLog(@"[Sandbox] 下载: %@ → %@", e.path, localDir);
-            // TODO: implement binary file transfer
-            // [self downloadItemAtPath:e.path toLocalDir:localDir];
-        }];
+        NSString *localPath = panel.URL.path;
+
+        // Store pending download info
+        self.pendingDownloadName = e.name;
+        self.pendingDownloadDir  = [localPath stringByDeletingLastPathComponent];
+
+        // Send download request to the server
+        [self setStatus:[NSString stringWithFormat:@"下载中: %@ ...", e.name]];
+        [self sendMessage:@"sandboxDownload" content:@{@"path": e.path}];
     }];
 }
 
@@ -425,7 +428,35 @@ static NSString * const kTypeSandboxDelete    = @"sandboxDelete";
         [self handleCreateDirResponse:content];
     } else if ([type isEqualToString:kTypeSandboxDelete]) {
         [self handleDeleteResponse:content];
+    } else if ([type isEqualToString:@"sandboxDownload"]) {
+        [self handleDownloadResponse:content];
     }
+}
+
+- (void)handleDownloadResponse:(NSDictionary *)content {
+    BOOL success = [content[@"success"] boolValue];
+    if (!success) {
+        [self setStatus:[NSString stringWithFormat:@"下载失败: %@", content[@"error"] ?: @"未知"]];
+        self.pendingDownloadName = nil;
+        return;
+    }
+    // Binary data will arrive in didReceiveBinaryData:
+    // The JSON response here just confirms the file was found on the server.
+}
+
+- (void)didReceiveBinaryData:(NSData *)data {
+    if (!self.pendingDownloadName || !self.pendingDownloadDir) return;
+
+    NSString *filePath = [self.pendingDownloadDir stringByAppendingPathComponent:self.pendingDownloadName];
+    NSError *error = nil;
+    BOOL ok = [data writeToFile:filePath options:NSDataWritingAtomic error:&error];
+    if (ok) {
+        [self setStatus:[NSString stringWithFormat:@"已下载: %@", self.pendingDownloadName]];
+    } else {
+        [self setStatus:[NSString stringWithFormat:@"保存失败: %@", error.localizedDescription]];
+    }
+    self.pendingDownloadName = nil;
+    self.pendingDownloadDir  = nil;
 }
 
 - (void)handleListResponse:(NSDictionary *)content {

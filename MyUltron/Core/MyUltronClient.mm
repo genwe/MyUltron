@@ -188,22 +188,31 @@ static NSString * const kMsgKeyContent = @"content";
 
         _builder->decodePacket(packetData);
         myultron_packet_t *pkt = _builder->getPacket();
-        if (pkt == NULL || pkt->header.packetType != MyUltronPacketTypeJsonMessage)
-            continue;
+        if (pkt == NULL) continue;
 
         size_t payloadLen = pkt->header.length - MYULTRON_PACKET_HEADER_SIZE;
         if (payloadLen == 0) continue;
 
-        NSData *jsonData = [NSData dataWithBytes:pkt->payload length:payloadLen];
-        NSDictionary *dict = [NSJSONSerialization JSONObjectWithData:jsonData options:0 error:nil];
-        if (![dict isKindOfClass:[NSDictionary class]]) continue;
+        if (pkt->header.packetType == MyUltronPacketTypeJsonMessage) {
+            NSData *jsonData = [NSData dataWithBytes:pkt->payload length:payloadLen];
+            NSDictionary *dict = [NSJSONSerialization JSONObjectWithData:jsonData options:0 error:nil];
+            if (![dict isKindOfClass:[NSDictionary class]]) continue;
 
-        NSLog(@"[MyUltron] Received: type=%@", dict[kMsgKeyType]);
-        dispatch_async(dispatch_get_main_queue(), ^{
-            if ([self.delegate respondsToSelector:@selector(client:didReceiveMessage:)]) {
-                [self.delegate client:self didReceiveMessage:dict];
-            }
-        });
+            NSLog(@"[MyUltron] Received: type=%@", dict[kMsgKeyType]);
+            dispatch_async(dispatch_get_main_queue(), ^{
+                if ([self.delegate respondsToSelector:@selector(client:didReceiveMessage:)]) {
+                    [self.delegate client:self didReceiveMessage:dict];
+                }
+            });
+        } else if (pkt->header.packetType == MyUltronPacketTypeBinaryMessage) {
+            NSData *binaryData = [NSData dataWithBytes:pkt->payload length:payloadLen];
+            NSLog(@"[MyUltron] Received binary: %lu bytes", (unsigned long)binaryData.length);
+            dispatch_async(dispatch_get_main_queue(), ^{
+                if ([self.delegate respondsToSelector:@selector(client:didReceiveBinaryData:)]) {
+                    [self.delegate client:self didReceiveBinaryData:binaryData];
+                }
+            });
+        }
     }
 }
 
