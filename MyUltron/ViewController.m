@@ -1,4 +1,5 @@
 #import "ViewController.h"
+#import "AppDelegate.h"
 
 #import "Features/MessagePushViewController.h"
 #import "Features/DeviceScreenshotViewController.h"
@@ -88,8 +89,8 @@
     self.containerView.layer.borderColor = [[NSColor lightGrayColor] CGColor];
     [self.view addSubview:self.containerView];
 
-    // Init TCP client (port defaults to 62345 — the release port on the device)
-    self.serverPort = 62345;
+    // Init TCP client (port from Preferences, default 62345)
+    self.serverPort = [AppDelegate serverPort];
     self.client = [[MyUltronClient alloc] init];
     self.client.delegate = self;
 }
@@ -340,11 +341,12 @@
     [self.client disconnect];
     [self stopIproxy];
 
+    // Always read the latest port from Preferences
+    self.serverPort = [AppDelegate serverPort];
+
     if (self.selectedIsSimulator) {
-        // Simulator: iOS app runs on the same host, connect to localhost
         [self.client connectToHost:@"127.0.0.1" port:self.serverPort];
     } else {
-        // Real device: start iproxy to forward the port via USB
         [self startIproxyAndConnect];
     }
 }
@@ -352,7 +354,7 @@
 - (void)startIproxyAndConnect {
     NSString *iproxyPath = @"/usr/local/bin/iproxy";
     if (![[NSFileManager defaultManager] isExecutableFileAtPath:iproxyPath]) {
-        iproxyPath = @"/opt/homebrew/bin/iproxy"; // Apple Silicon Homebrew
+        iproxyPath = @"/opt/homebrew/bin/iproxy";
     }
     if (![[NSFileManager defaultManager] isExecutableFileAtPath:iproxyPath]) {
         NSLog(@"[MyUltron] iproxy not found — install libimobiledevice");
@@ -360,6 +362,8 @@
         return;
     }
 
+    // Always read the latest port from Preferences
+    self.serverPort = [AppDelegate serverPort];
     uint16_t localPort  = self.serverPort;
     uint16_t remotePort = self.serverPort;
 
@@ -500,35 +504,44 @@
 #pragma mark - Toast
 
 - (void)showToast:(NSString *)message {
-    NSTextField *toast = [[NSTextField alloc] initWithFrame:NSMakeRect(0, 0, 180, 28)];
-    toast.stringValue = message;
-    toast.editable = NO;
-    toast.bordered = NO;
-    toast.selectable = NO;
-    toast.alignment = NSTextAlignmentCenter;
-    toast.textColor = [NSColor whiteColor];
-    toast.backgroundColor = [NSColor colorWithWhite:0 alpha:0.75];
-    toast.wantsLayer = YES;
-    toast.layer.cornerRadius = 6;
-    toast.layer.masksToBounds = YES;
-    toast.font = [NSFont systemFontOfSize:13];
+    // Container view for rounded background
+    NSView *container = [[NSView alloc] initWithFrame:NSMakeRect(0, 0, 220, 36)];
+    container.wantsLayer = YES;
+    container.layer.backgroundColor = [[NSColor colorWithWhite:0 alpha:0.75] CGColor];
+    container.layer.cornerRadius = 8;
+    container.layer.masksToBounds = YES;
 
-    NSRect bounds = self.scrollView.bounds;
-    toast.frame = NSMakeRect((bounds.size.width - 180) / 2, bounds.size.height - 40, 180, 28);
-    toast.autoresizingMask = NSViewMinXMargin | NSViewMaxXMargin | NSViewMinYMargin;
-    toast.alphaValue = 0;
-    [self.scrollView addSubview:toast];
+    // Centered label inside the container
+    NSTextField *label = [[NSTextField alloc] initWithFrame:NSMakeRect(12, 7, 196, 22)];
+    label.stringValue = message;
+    label.editable = NO;
+    label.bordered = NO;
+    label.selectable = NO;
+    label.drawsBackground = NO;
+    label.alignment = NSTextAlignmentCenter;
+    label.textColor = [NSColor whiteColor];
+    label.font = [NSFont systemFontOfSize:14];
+    [container addSubview:label];
+
+    NSRect bounds = self.view.bounds;
+    container.frame = NSMakeRect((bounds.size.width - 220) / 2,
+                                 (bounds.size.height - 36) / 2,
+                                 220, 36);
+    container.autoresizingMask = NSViewMinXMargin | NSViewMaxXMargin |
+                                  NSViewMinYMargin | NSViewMaxYMargin;
+    container.alphaValue = 0;
+    [self.view addSubview:container];
 
     [NSAnimationContext runAnimationGroup:^(NSAnimationContext *context) {
         context.duration = 0.25;
-        toast.animator.alphaValue = 1.0;
+        container.animator.alphaValue = 1.0;
     } completionHandler:^{
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
             [NSAnimationContext runAnimationGroup:^(NSAnimationContext *context) {
                 context.duration = 0.5;
-                toast.animator.alphaValue = 0;
+                container.animator.alphaValue = 0;
             } completionHandler:^{
-                [toast removeFromSuperview];
+                [container removeFromSuperview];
             }];
         });
     }];

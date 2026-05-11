@@ -9,6 +9,7 @@
 
 @interface AppDelegate : NSObject <NSApplicationDelegate>
 
++ (uint16_t)serverPort;
 
 @end
 
