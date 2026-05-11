@@ -20,4 +20,8 @@
 - (void)viewDidConnect;
 - (void)viewDidDisconnect;
 
+/// Override to return NO for features that work without a device connection
+/// (e.g. Codec). Default is YES.
++ (BOOL)requiresConnection;
+
 @end

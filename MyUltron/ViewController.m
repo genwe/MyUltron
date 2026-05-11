@@ -452,27 +452,25 @@
     NSInteger row = self.tableView.selectedRow;
     if (row < 0 || row >= (NSInteger)self.featureItems.count) return;
 
-    if (!self.selectedUDID) {
-        [self showToast:@"请选择连接设备"];
-        return;
-    }
-    if ([self.appButton.title isEqualToString:@"请选择应用"]) {
-        [self showToast:@"请选择应用"];
-        return;
+    NSArray *classes = [self featureClasses];
+    Class cls = classes[row];
+    if ([cls requiresConnection]) {
+        if (!self.selectedUDID) {
+            [self showToast:@"请选择连接设备"];
+            return;
+        }
+        if ([self.appButton.title isEqualToString:@"请选择应用"]) {
+            [self showToast:@"请选择应用"];
+            return;
+        }
     }
 
     NSLog(@"[Ultron] 选中功能: %@", self.featureItems[row]);
     [self showFeatureAtIndex:row];
 }
 
-- (void)showFeatureAtIndex:(NSInteger)index {
-    if (self.currentFeatureVC) {
-        [self.currentFeatureVC.view removeFromSuperview];
-        [self.currentFeatureVC removeFromParentViewController];
-        self.currentFeatureVC = nil;
-    }
-
-    NSArray *classes = @[
+- (NSArray<Class> *)featureClasses {
+    return @[
         [MessagePushViewController class],
         [DeviceScreenshotViewController class],
         [SandboxViewController class],
@@ -491,7 +489,16 @@
         [CodecViewController class],
         [XlogParserViewController class]
     ];
+}
 
+- (void)showFeatureAtIndex:(NSInteger)index {
+    if (self.currentFeatureVC) {
+        [self.currentFeatureVC.view removeFromSuperview];
+        [self.currentFeatureVC removeFromParentViewController];
+        self.currentFeatureVC = nil;
+    }
+
+    NSArray *classes = [self featureClasses];
     Class cls = classes[index];
     FeatureViewController *vc = [[cls alloc] init];
     [self addChildViewController:vc];
