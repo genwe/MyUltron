@@ -250,6 +250,12 @@
 
     NSMutableArray *apps = [NSMutableArray array];
     [plistDict enumerateKeysAndObjectsUsingBlock:^(NSString *bundleID, NSDictionary *info, BOOL *stop) {
+        // Filter: skip Apple system apps and App Store apps
+        if ([bundleID hasPrefix:@"com.apple."]) return;
+
+        NSString *appType = info[@"ApplicationType"];
+        if ([appType isEqualToString:@"System"]) return;
+
         NSString *name = info[@"CFBundleDisplayName"] ?: info[@"CFBundleName"] ?: bundleID;
         [apps addObject:@{@"name": name, @"bundleID": bundleID}];
     }];
@@ -287,7 +293,13 @@
                     plist_get_string_val(nameNode, &nameStr);
                     plist_get_string_val(bidNode, &bidStr);
                     if (nameStr && bidStr) {
-                        [apps addObject:@{@"name": @(nameStr), @"bundleID": @(bidStr)}];
+                        NSString *bid = @(bidStr);
+                        // Skip Apple system apps
+                        if ([bid hasPrefix:@"com.apple."]) {
+                            free(nameStr); free(bidStr);
+                            continue;
+                        }
+                        [apps addObject:@{@"name": @(nameStr), @"bundleID": bid}];
                     }
                     free(nameStr); free(bidStr);
                 }
