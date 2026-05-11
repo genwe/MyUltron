@@ -18,6 +18,7 @@
 #import "Features/CodecViewController.h"
 #import "Features/XlogParserViewController.h"
 #import "Core/MyUltronClient.h"
+#import "Features/FeatureViewController.h"
 
 #include <libimobiledevice/libimobiledevice.h>
 #include <libimobiledevice/lockdown.h>
@@ -26,7 +27,7 @@
 
 @interface ViewController () <NSTableViewDataSource, NSTableViewDelegate, MyUltronClientDelegate>
 @property (nonatomic, strong) NSArray<NSString *> *featureItems;
-@property (nonatomic, strong) NSViewController *currentFeatureVC;
+@property (nonatomic, strong) FeatureViewController *currentFeatureVC;
 
 // Connection layer
 @property (nonatomic, strong, readwrite) MyUltronClient *client;
@@ -389,17 +390,26 @@
 
 - (void)clientDidConnect:(MyUltronClient *)client {
     [self showToast:@"已连接到 App"];
+    if ([self.currentFeatureVC respondsToSelector:@selector(viewDidConnect)]) {
+        [self.currentFeatureVC viewDidConnect];
+    }
 }
 
 - (void)clientDidDisconnect:(MyUltronClient *)client {
     [self showToast:@"连接已断开"];
+    if ([self.currentFeatureVC respondsToSelector:@selector(viewDidDisconnect)]) {
+        [self.currentFeatureVC viewDidDisconnect];
+    }
 }
 
 - (void)client:(MyUltronClient *)client didReceiveMessage:(NSDictionary *)dict {
-    // Forward the received message to the currently active feature view controller,
-    // or handle routing here.
     NSString *type = dict[@"messageType"];
     NSLog(@"[MyUltron] ← messageType: %@", type);
+
+    // Forward to the active feature view controller if it handles messages
+    if ([self.currentFeatureVC respondsToSelector:@selector(didReceiveMessage:)]) {
+        [self.currentFeatureVC didReceiveMessage:dict];
+    }
 }
 
 - (void)setRepresentedObject:(id)representedObject {
@@ -461,7 +471,7 @@
     ];
 
     Class cls = classes[index];
-    NSViewController *vc = [[cls alloc] init];
+    FeatureViewController *vc = [[cls alloc] init];
     [self addChildViewController:vc];
     vc.view.frame = self.containerView.bounds;
     vc.view.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;

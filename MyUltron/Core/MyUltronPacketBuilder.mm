@@ -47,8 +47,12 @@ void MyUltronPacketBuilder::buildBinaryPacket(NSData *data) {
 
 void MyUltronPacketBuilder::buildJsonPacket(NSDictionary *dict) {
     resetPacket();
-    if (![NSJSONSerialization isValidJSONObject:dict]) return;
-    NSData *data = [NSJSONSerialization dataWithJSONObject:dict options:0 error:nil];
+    NSError *error = nil;
+    NSData *data = [NSJSONSerialization dataWithJSONObject:dict options:0 error:&error];
+    if (!data) {
+        NSLog(@"[MyUltron] JSON serialization failed: %@, dict=%@", error, dict);
+        return;
+    }
     doBuildPacket(data, MyUltronPacketTypeJsonMessage);
 }
 
