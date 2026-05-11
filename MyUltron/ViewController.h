@@ -7,6 +7,8 @@
 
 #import <Cocoa/Cocoa.h>
 
+@class MyUltronClient;
+
 @interface ViewController : NSViewController
 
 @property (nonatomic, strong) NSButton *deviceButton;
@@ -16,6 +18,7 @@
 @property (nonatomic, strong) NSView *containerView;
 @property (nonatomic, copy) NSString *selectedUDID;
 @property (nonatomic, assign) BOOL selectedIsSimulator;
+@property (nonatomic, strong, readonly) MyUltronClient *client;
 
 @end
 

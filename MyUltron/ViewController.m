@@ -17,15 +17,21 @@
 #import "Features/GrayscaleTaskViewController.h"
 #import "Features/CodecViewController.h"
 #import "Features/XlogParserViewController.h"
+#import "Core/MyUltronClient.h"
 
 #include <libimobiledevice/libimobiledevice.h>
 #include <libimobiledevice/lockdown.h>
 #include <libimobiledevice/installation_proxy.h>
 #include <plist/plist.h>
 
-@interface ViewController () <NSTableViewDataSource, NSTableViewDelegate>
+@interface ViewController () <NSTableViewDataSource, NSTableViewDelegate, MyUltronClientDelegate>
 @property (nonatomic, strong) NSArray<NSString *> *featureItems;
 @property (nonatomic, strong) NSViewController *currentFeatureVC;
+
+// Connection layer
+@property (nonatomic, strong, readwrite) MyUltronClient *client;
+@property (nonatomic, strong) NSTask        *iproxyTask;
+@property (nonatomic, assign) uint16_t       serverPort;  // 62345 release / 72345 debug
 @end
 
 @implementation ViewController
@@ -80,6 +86,11 @@
     self.containerView.layer.borderWidth = 1;
     self.containerView.layer.borderColor = [[NSColor lightGrayColor] CGColor];
     [self.view addSubview:self.containerView];
+
+    // Init TCP client (port defaults to 62345 — the release port on the device)
+    self.serverPort = 62345;
+    self.client = [[MyUltronClient alloc] init];
+    self.client.delegate = self;
 }
 
 - (void)showDeviceMenu:(NSButton *)sender {
@@ -155,7 +166,18 @@
 - (void)selectApp:(NSMenuItem *)item {
     NSDictionary *app = item.representedObject;
     self.appButton.title = app[@"name"];
-    [self launchApp:app[@"bundleID"] onDevice:self.selectedUDID isSimulator:self.selectedIsSimulator];
+
+    // Keep track of the selected app info for connection
+    NSString *bundleID = app[@"bundleID"];
+
+    // Launch the app
+    [self launchApp:bundleID onDevice:self.selectedUDID isSimulator:self.selectedIsSimulator];
+
+    // Then connect to MyUltronServer running inside the app
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.0 * NSEC_PER_SEC)),
+                   dispatch_get_main_queue(), ^{
+        [self connectToDeviceServer];
+    });
 }
 
 #pragma mark - Device helpers
@@ -297,6 +319,87 @@
     if (![task launchAndReturnError:&err]) {
         NSLog(@"启动失败: %@", err.localizedDescription);
     }
+}
+
+#pragma mark - TCP Connection
+
+- (void)connectToDeviceServer {
+    [self.client disconnect];
+    [self stopIproxy];
+
+    if (self.selectedIsSimulator) {
+        // Simulator: iOS app runs on the same host, connect to localhost
+        [self.client connectToHost:@"127.0.0.1" port:self.serverPort];
+    } else {
+        // Real device: start iproxy to forward the port via USB
+        [self startIproxyAndConnect];
+    }
+}
+
+- (void)startIproxyAndConnect {
+    NSString *iproxyPath = @"/usr/local/bin/iproxy";
+    if (![[NSFileManager defaultManager] isExecutableFileAtPath:iproxyPath]) {
+        iproxyPath = @"/opt/homebrew/bin/iproxy"; // Apple Silicon Homebrew
+    }
+    if (![[NSFileManager defaultManager] isExecutableFileAtPath:iproxyPath]) {
+        NSLog(@"[MyUltron] iproxy not found — install libimobiledevice");
+        [self showToast:@"未找到 iproxy，请安装 libimobiledevice"];
+        return;
+    }
+
+    uint16_t localPort  = self.serverPort;
+    uint16_t remotePort = self.serverPort;
+
+    NSTask *task = [[NSTask alloc] init];
+    task.executableURL = [NSURL fileURLWithPath:iproxyPath];
+    task.arguments = @[
+        [NSString stringWithFormat:@"%u", localPort],
+        [NSString stringWithFormat:@"%u", remotePort],
+        self.selectedUDID ?: @""
+    ];
+    task.standardOutput = [NSPipe pipe];
+    task.standardError  = [NSPipe pipe];
+
+    NSError *err = nil;
+    if (![task launchAndReturnError:&err]) {
+        NSLog(@"[MyUltron] iproxy launch failed: %@", err);
+        return;
+    }
+
+    self.iproxyTask = task;
+    NSLog(@"[MyUltron] iproxy started: %u → device %@:%u",
+          localPort, self.selectedUDID, remotePort);
+
+    // Give iproxy a moment to bind, then connect
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.0 * NSEC_PER_SEC)),
+                   dispatch_get_main_queue(), ^{
+        [self.client connectToHost:@"127.0.0.1" port:localPort];
+    });
+}
+
+- (void)stopIproxy {
+    if (self.iproxyTask && self.iproxyTask.isRunning) {
+        [self.iproxyTask terminate];
+        NSLog(@"[MyUltron] iproxy stopped");
+    }
+    self.iproxyTask = nil;
+}
+
+#pragma mark - MyUltronClientDelegate
+
+- (void)clientDidConnect:(MyUltronClient *)client {
+    [self showToast:@"已连接到 App"];
+}
+
+- (void)clientDidDisconnect:(MyUltronClient *)client {
+    [self showToast:@"连接已断开"];
+}
+
+- (void)client:(MyUltronClient *)client didReceiveMessage:(NSDictionary *)dict {
+    // Forward the received message to the currently active feature view controller,
+    // or handle routing here.
+    NSString *type = dict[@"messageType"];
+    NSLog(@"[MyUltron] ← messageType: %@", type);
 }
 
 - (void)setRepresentedObject:(id)representedObject {
