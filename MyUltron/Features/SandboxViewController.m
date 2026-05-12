@@ -101,7 +101,6 @@ static NSString * const kTypeSandboxDelete    = @"sandboxDelete";
 
 - (void)buildUI {
     CGFloat margin = 12;
-    CGFloat btnW   = 28;
     CGFloat y      = self.view.bounds.size.height - 36;
 
     // ---- Path field ----
@@ -117,29 +116,29 @@ static NSString * const kTypeSandboxDelete    = @"sandboxDelete";
     y += 1;
 
     // ---- Back (up) button ----
-    self.backButton = [self buttonWithSymbol:@"←" title:@"返回" x:&x y:y];
+    self.backButton = [self buttonWithTitle:@"← 返回" width:52 x:&x y:y];
     self.backButton.action = @selector(navigateUp:);
 
     // ---- Refresh ----
-    self.refreshButton = [self buttonWithSymbol:@"↻" title:@"刷新" x:&x y:y];
+    self.refreshButton = [self buttonWithTitle:@"↻ 刷新" width:52 x:&x y:y];
     self.refreshButton.action = @selector(refreshListing:);
 
     // ---- New folder ----
-    self.addFolderButton = [self buttonWithSymbol:@"＋" title:@"新建文件夹" x:&x y:y];
+    self.addFolderButton = [self buttonWithTitle:@"＋ 新建文件夹" width:80 x:&x y:y];
     self.addFolderButton.action = @selector(createFolder:);
 
     // ---- Delete ----
-    self.deleteButton = [self buttonWithSymbol:@"✕" title:@"删除选中" x:&x y:y];
+    self.deleteButton = [self buttonWithTitle:@"✕ 删除" width:52 x:&x y:y];
     self.deleteButton.action = @selector(deleteSelected:);
 
     x += 8;
 
     // ---- Upload ----
-    self.uploadButton = [self buttonWithSymbol:@"↑" title:@"上传" x:&x y:y];
+    self.uploadButton = [self buttonWithTitle:@"↑ 上传" width:52 x:&x y:y];
     self.uploadButton.action = @selector(uploadFile:);
 
     // ---- Download ----
-    self.downloadButton = [self buttonWithSymbol:@"↓" title:@"下载" x:&x y:y];
+    self.downloadButton = [self buttonWithTitle:@"↓ 下载" width:52 x:&x y:y];
     self.downloadButton.action = @selector(downloadFile:);
 
     // ---- Table view ----
@@ -157,9 +156,9 @@ static NSString * const kTypeSandboxDelete    = @"sandboxDelete";
     self.tableView.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
 
     NSArray *cols = @[
+        @{@"id": @"type", @"title": @"类型",   @"w": @80},
         @{@"id": @"name", @"title": @"名称",   @"w": @200},
         @{@"id": @"size", @"title": @"大小",   @"w": @80},
-        @{@"id": @"type", @"title": @"类型",   @"w": @80},
         @{@"id": @"date", @"title": @"修改时间", @"w": @150},
     ];
     for (NSDictionary *c in cols) {
@@ -174,6 +173,7 @@ static NSString * const kTypeSandboxDelete    = @"sandboxDelete";
     self.tableView.doubleAction = @selector(tableViewDoubleClick:);
     self.tableView.target       = self;
     self.tableView.allowsMultipleSelection = YES;
+    self.tableView.usesAlternatingRowBackgroundColors = YES;
 
     self.scrollView.documentView = self.tableView;
     [self.view addSubview:self.scrollView];
@@ -189,20 +189,19 @@ static NSString * const kTypeSandboxDelete    = @"sandboxDelete";
     [self.view addSubview:self.statusLabel];
 }
 
-- (NSButton *)buttonWithSymbol:(NSString *)sym
-                         title:(NSString *)tooltip
+- (NSButton *)buttonWithTitle:(NSString *)title
+                        width:(CGFloat)w
                              x:(CGFloat *)x
                              y:(CGFloat)y
 {
-    NSButton *btn = [[NSButton alloc] initWithFrame:NSMakeRect(*x, y, 28, 24)];
-    btn.title          = sym;
-    btn.toolTip        = tooltip;
+    NSButton *btn = [[NSButton alloc] initWithFrame:NSMakeRect(*x, y, w, 24)];
+    btn.title          = title;
     btn.bezelStyle     = NSBezelStyleSmallSquare;
     btn.bordered       = NO;
-    btn.font           = [NSFont systemFontOfSize:14];
+    btn.font           = [NSFont systemFontOfSize:12];
     btn.autoresizingMask = NSViewMaxXMargin | NSViewMinYMargin;
     [self.view addSubview:btn];
-    *x += 30;
+    *x += w + 6;
     return btn;
 }
 
@@ -233,6 +232,13 @@ static NSString * const kTypeSandboxDelete    = @"sandboxDelete";
         tf.cell.truncatesLastVisibleLine = YES;
         [cell addSubview:tf];
         cell.textField = tf;
+
+        if ([colID isEqualToString:@"type"]) {
+            NSImageView *iv = [[NSImageView alloc] initWithFrame:NSZeroRect];
+            iv.imageScaling = NSImageScaleProportionallyDown;
+            [cell addSubview:iv];
+            cell.imageView = iv;
+        }
     }
 
     NSString *value = @"";
@@ -243,14 +249,14 @@ static NSString * const kTypeSandboxDelete    = @"sandboxDelete";
 
     cell.textField.stringValue = value;
 
-    // Constrain text field to column width
-    CGFloat iconPad = ([colID isEqualToString:@"name"]) ? 22.0 : 4.0;
+    // Constrain text field to column width, all columns vertically centered
+    CGFloat iconPad = ([colID isEqualToString:@"type"]) ? 22.0 : 4.0;
     CGFloat colW    = column.width;
     CGFloat rowH    = tableView.rowHeight;
-    cell.textField.frame = NSMakeRect(iconPad, 0, colW - iconPad - 4, rowH);
+    cell.textField.frame = NSMakeRect(iconPad, (rowH - 16) / 2, colW - iconPad - 4, 16);
 
-    // Icon only for name column
-    if ([colID isEqualToString:@"name"]) {
+    // Icon only for type column
+    if ([colID isEqualToString:@"type"]) {
         NSImage *icon = e.isDir
             ? [[NSWorkspace sharedWorkspace] iconForFileType:NSFileTypeForHFSTypeCode(kGenericFolderIcon)]
             : [[NSWorkspace sharedWorkspace] iconForFileType:(__bridge NSString *)kUTTypeData];

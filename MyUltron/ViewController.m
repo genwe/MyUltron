@@ -133,6 +133,7 @@
     tableView.headerView = nil;
     tableView.dataSource = self;
     tableView.delegate = self;
+    tableView.usesAlternatingRowBackgroundColors = YES;
 
     scrollView.documentView = tableView;
     self.scrollView = scrollView;
@@ -506,8 +507,24 @@
     return self.featureItems.count;
 }
 
-- (id)tableView:(NSTableView *)tableView objectValueForTableColumn:(NSTableColumn *)tableColumn row:(NSInteger)row {
-    return self.featureItems[row];
+- (NSView *)tableView:(NSTableView *)tableView viewForTableColumn:(NSTableColumn *)tableColumn row:(NSInteger)row {
+    NSTableCellView *cell = [tableView makeViewWithIdentifier:@"featureCell" owner:self];
+    if (!cell) {
+        cell = [[NSTableCellView alloc] initWithFrame:NSZeroRect];
+        cell.identifier = @"featureCell";
+        NSTextField *tf = [[NSTextField alloc] initWithFrame:NSZeroRect];
+        tf.editable = NO;
+        tf.bordered = NO;
+        tf.drawsBackground = NO;
+        tf.font = [NSFont systemFontOfSize:13];
+        tf.lineBreakMode = NSLineBreakByTruncatingTail;
+        [cell addSubview:tf];
+        cell.textField = tf;
+    }
+    cell.textField.stringValue = self.featureItems[row];
+    CGFloat rowH = tableView.rowHeight;
+    cell.textField.frame = NSMakeRect(8, (rowH - 16) / 2, tableColumn.width - 16, 16);
+    return cell;
 }
 
 - (void)tableViewSelectionDidChange:(NSNotification *)notification {

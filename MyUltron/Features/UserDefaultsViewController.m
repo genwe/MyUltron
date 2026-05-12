@@ -92,6 +92,7 @@ static NSString * const kMsgContent = @"content";
     self.tableView.delegate   = self;
     self.tableView.doubleAction = @selector(tableViewDoubleClick:);
     self.tableView.target       = self;
+    self.tableView.usesAlternatingRowBackgroundColors = YES;
     self.scrollView.documentView = self.tableView;
     [self.view addSubview:self.scrollView];
 
@@ -138,7 +139,8 @@ static NSString * const kMsgContent = @"content";
     else if ([cid isEqualToString:@"type"]) v = e.type;
     else if ([cid isEqualToString:@"val"])  v = e.preview;
     cell.textField.stringValue = v;
-    cell.textField.frame = NSMakeRect(4, 0, column.width - 8, tableView.rowHeight);
+    CGFloat rowH = tableView.rowHeight;
+    cell.textField.frame = NSMakeRect(4, (rowH - 16) / 2, column.width - 8, 16);
     return cell;
 }
 
