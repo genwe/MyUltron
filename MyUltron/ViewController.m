@@ -24,7 +24,60 @@
 #include <libimobiledevice/libimobiledevice.h>
 #include <libimobiledevice/lockdown.h>
 #include <libimobiledevice/installation_proxy.h>
+#include <libimobiledevice/afc.h>
 #include <plist/plist.h>
+
+// MARK: - DragForwardingView (forwards NSDraggingDestination to ViewController)
+
+@interface DragForwardingView : NSView
+@property (nonatomic, weak) ViewController *dragDelegate;
+@end
+
+@implementation DragForwardingView
+
+- (NSDragOperation)draggingEntered:(id<NSDraggingInfo>)sender {
+    if ([self.dragDelegate respondsToSelector:@selector(draggingEntered:)]) {
+        return [self.dragDelegate draggingEntered:sender];
+    }
+    return NSDragOperationNone;
+}
+
+- (NSDragOperation)draggingUpdated:(id<NSDraggingInfo>)sender {
+    if ([self.dragDelegate respondsToSelector:@selector(draggingUpdated:)]) {
+        return [self.dragDelegate draggingUpdated:sender];
+    }
+    return NSDragOperationNone;
+}
+
+- (void)draggingExited:(id<NSDraggingInfo>)sender {
+    if ([self.dragDelegate respondsToSelector:@selector(draggingExited:)]) {
+        [self.dragDelegate draggingExited:sender];
+    }
+}
+
+- (BOOL)prepareForDragOperation:(id<NSDraggingInfo>)sender {
+    if ([self.dragDelegate respondsToSelector:@selector(prepareForDragOperation:)]) {
+        return [self.dragDelegate prepareForDragOperation:sender];
+    }
+    return NO;
+}
+
+- (BOOL)performDragOperation:(id<NSDraggingInfo>)sender {
+    if ([self.dragDelegate respondsToSelector:@selector(performDragOperation:)]) {
+        return [self.dragDelegate performDragOperation:sender];
+    }
+    return NO;
+}
+
+- (void)concludeDragOperation:(id<NSDraggingInfo>)sender {
+    if ([self.dragDelegate respondsToSelector:@selector(concludeDragOperation:)]) {
+        [self.dragDelegate concludeDragOperation:sender];
+    }
+}
+
+@end
+
+// MARK: - ViewController
 
 @interface ViewController () <NSTableViewDataSource, NSTableViewDelegate, MyUltronClientDelegate>
 @property (nonatomic, strong) NSArray<NSString *> *featureItems;
@@ -37,6 +90,12 @@
 @end
 
 @implementation ViewController
+
+- (void)loadView {
+    DragForwardingView *view = [[DragForwardingView alloc] initWithFrame:NSMakeRect(0, 0, 900, 650)];
+    view.dragDelegate = self;
+    self.view = view;
+}
 
 - (void)viewDidLoad {
     [super viewDidLoad];
@@ -88,6 +147,9 @@
     self.containerView.layer.borderWidth = 1;
     self.containerView.layer.borderColor = [[NSColor lightGrayColor] CGColor];
     [self.view addSubview:self.containerView];
+
+    // Register drag-and-drop for .app / .ipa files
+    [self.view registerForDraggedTypes:@[NSPasteboardTypeFileURL]];
 
     // Init TCP client (port from Preferences, default 62345)
     self.serverPort = [AppDelegate serverPort];
@@ -552,6 +614,359 @@
             }];
         });
     }];
+}
+
+#pragma mark - Drag & Drop (NSDraggingDestination)
+
+- (BOOL)isInstallableFileAtURL:(NSURL *)url {
+    NSString *ext = [url pathExtension].lowercaseString;
+    if ([ext isEqualToString:@"app"] || [ext isEqualToString:@"ipa"]) {
+        return YES;
+    }
+    // .app bundle might be passed as directory without extension in the URL
+    NSString *path = url.path;
+    if ([path.pathExtension.lowercaseString isEqualToString:@"app"]) {
+        return YES;
+    }
+    return NO;
+}
+
+- (void)setDragHighlight:(BOOL)highlight {
+    if (highlight) {
+        self.containerView.layer.borderWidth = 3;
+        self.containerView.layer.borderColor = [[NSColor systemBlueColor] CGColor];
+    } else {
+        self.containerView.layer.borderWidth = 1;
+        self.containerView.layer.borderColor = [[NSColor lightGrayColor] CGColor];
+    }
+}
+
+- (NSDragOperation)draggingEntered:(id<NSDraggingInfo>)sender {
+    NSPasteboard *pboard = [sender draggingPasteboard];
+    NSArray<NSURL *> *urls = [pboard readObjectsForClasses:@[[NSURL class]]
+                                                   options:@{NSPasteboardURLReadingFileURLsOnlyKey: @YES}];
+    for (NSURL *url in urls) {
+        if ([self isInstallableFileAtURL:url]) {
+            [self setDragHighlight:YES];
+            return NSDragOperationCopy;
+        }
+    }
+    return NSDragOperationNone;
+}
+
+- (NSDragOperation)draggingUpdated:(id<NSDraggingInfo>)sender {
+    NSPasteboard *pboard = [sender draggingPasteboard];
+    NSArray<NSURL *> *urls = [pboard readObjectsForClasses:@[[NSURL class]]
+                                                   options:@{NSPasteboardURLReadingFileURLsOnlyKey: @YES}];
+    for (NSURL *url in urls) {
+        if ([self isInstallableFileAtURL:url]) {
+            return NSDragOperationCopy;
+        }
+    }
+    [self setDragHighlight:NO];
+    return NSDragOperationNone;
+}
+
+- (void)draggingExited:(id<NSDraggingInfo>)sender {
+    [self setDragHighlight:NO];
+}
+
+- (BOOL)prepareForDragOperation:(id<NSDraggingInfo>)sender {
+    return YES;
+}
+
+- (BOOL)performDragOperation:(id<NSDraggingInfo>)sender {
+    [self setDragHighlight:NO];
+
+    NSPasteboard *pboard = [sender draggingPasteboard];
+    NSArray<NSURL *> *urls = [pboard readObjectsForClasses:@[[NSURL class]]
+                                                   options:@{NSPasteboardURLReadingFileURLsOnlyKey: @YES}];
+    for (NSURL *url in urls) {
+        if ([self isInstallableFileAtURL:url]) {
+            [self installAppAtPath:url.path];
+            return YES;
+        }
+    }
+    return NO;
+}
+
+- (void)concludeDragOperation:(id<NSDraggingInfo>)sender {
+    [self setDragHighlight:NO];
+}
+
+#pragma mark - App Installation
+
+- (void)installAppAtPath:(NSString *)path {
+    if (!self.selectedUDID) {
+        [self showToast:@"请先选择设备后再拖拽安装"];
+        return;
+    }
+
+    NSString *fileName = path.lastPathComponent;
+    NSLog(@"[MyUltron] Installing: %@ → device: %@", fileName, self.selectedUDID);
+
+    [self showToast:[NSString stringWithFormat:@"正在安装 %@ ...", fileName]];
+
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        BOOL success = NO;
+        NSString *errorMsg = nil;
+
+        if (self.selectedIsSimulator) {
+            success = [self installToSimulator:path error:&errorMsg];
+        } else {
+            success = [self installToDevice:path error:&errorMsg];
+        }
+
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (success) {
+                [self showToast:[NSString stringWithFormat:@"%@ 安装成功", fileName]];
+                NSLog(@"[MyUltron] Install succeeded: %@", fileName);
+            } else {
+                [self showToast:[NSString stringWithFormat:@"安装失败: %@", errorMsg ?: @"未知错误"]];
+                NSLog(@"[MyUltron] Install failed: %@ — %@", fileName, errorMsg);
+            }
+        });
+    });
+}
+
+- (BOOL)installToSimulator:(NSString *)path error:(NSString **)error {
+    NSTask *task = [[NSTask alloc] init];
+    task.executableURL = [NSURL fileURLWithPath:@"/usr/bin/xcrun"];
+    task.arguments = @[@"simctl", @"install", self.selectedUDID, path];
+    task.standardOutput = [NSPipe pipe];
+    task.standardError = [NSPipe pipe];
+
+    NSError *err = nil;
+    if (![task launchAndReturnError:&err]) {
+        if (error) *error = err.localizedDescription;
+        return NO;
+    }
+    [task waitUntilExit];
+
+    if (task.terminationStatus != 0) {
+        NSData *errData = [[task.standardError fileHandleForReading] readDataToEndOfFile];
+        NSString *errStr = [[NSString alloc] initWithData:errData encoding:NSUTF8StringEncoding];
+        if (error) *error = errStr ?: @"simctl install failed";
+        return NO;
+    }
+    return YES;
+}
+
+- (BOOL)installToDevice:(NSString *)localPath error:(NSString **)error {
+    BOOL isDirectory = NO;
+    if (![[NSFileManager defaultManager] fileExistsAtPath:localPath isDirectory:&isDirectory]) {
+        if (error) *error = @"文件不存在";
+        return NO;
+    }
+
+    // 1. Connect to device
+    idevice_t device = NULL;
+    if (idevice_new_with_options(&device, self.selectedUDID.UTF8String, IDEVICE_LOOKUP_USBMUX) != IDEVICE_E_SUCCESS) {
+        if (error) *error = @"无法连接设备";
+        return NO;
+    }
+
+    // 2. Lockdown handshake
+    lockdownd_client_t lockdown = NULL;
+    if (lockdownd_client_new_with_handshake(device, &lockdown, "MyUltron") != LOCKDOWN_E_SUCCESS) {
+        idevice_free(device);
+        if (error) *error = @"lockdown handshake 失败";
+        return NO;
+    }
+
+    // 3. Upload file via AFC
+    NSString *remotePath = nil;
+    if (![self afcUpload:localPath isDirectory:isDirectory device:device lockdown:lockdown remotePath:&remotePath error:error]) {
+        lockdownd_client_free(lockdown);
+        idevice_free(device);
+        return NO;
+    }
+
+    // 4. Install via installation_proxy
+    BOOL success = [self instproxyInstall:remotePath isDirectory:isDirectory device:device lockdown:lockdown error:error];
+
+    // 5. Cleanup remote staging file (best-effort)
+    [self afcRemoveRemotePath:remotePath device:device lockdown:lockdown];
+
+    lockdownd_client_free(lockdown);
+    idevice_free(device);
+    return success;
+}
+
+#pragma mark - AFC Upload Helpers
+
+- (BOOL)afcUpload:(NSString *)localPath
+      isDirectory:(BOOL)isDirectory
+           device:(idevice_t)device
+         lockdown:(lockdownd_client_t)lockdown
+       remotePath:(NSString **)outRemotePath
+            error:(NSString **)error
+{
+    lockdownd_service_descriptor_t svc = NULL;
+    afc_client_t afc = NULL;
+
+    if (lockdownd_start_service(lockdown, AFC_SERVICE_NAME, &svc) != LOCKDOWN_E_SUCCESS || !svc) {
+        if (error) *error = @"无法启动 AFC 服务";
+        return NO;
+    }
+
+    if (afc_client_new(device, svc, &afc) != AFC_E_SUCCESS) {
+        lockdownd_service_descriptor_free(svc);
+        if (error) *error = @"无法创建 AFC 客户端";
+        return NO;
+    }
+    lockdownd_service_descriptor_free(svc);
+
+    NSString *fileName = localPath.lastPathComponent;
+    NSString *remotePath = [@"/PublicStaging" stringByAppendingPathComponent:fileName];
+    *outRemotePath = remotePath;
+
+    BOOL success = NO;
+    if (isDirectory) {
+        success = [self afcUploadDirectory:localPath toRemotePath:remotePath afc:afc error:error];
+    } else {
+        success = [self afcUploadFile:localPath toRemotePath:remotePath afc:afc error:error];
+    }
+
+    afc_client_free(afc);
+    return success;
+}
+
+- (BOOL)afcUploadFile:(NSString *)localPath
+         toRemotePath:(NSString *)remotePath
+                  afc:(afc_client_t)afc
+                error:(NSString **)error
+{
+    NSData *fileData = [NSData dataWithContentsOfFile:localPath];
+    if (!fileData) {
+        if (error) *error = @"无法读取本地文件";
+        return NO;
+    }
+
+    uint64_t handle = 0;
+    if (afc_file_open(afc, remotePath.UTF8String, AFC_FOPEN_WRONLY, &handle) != AFC_E_SUCCESS) {
+        if (error) *error = [NSString stringWithFormat:@"无法在设备上创建文件: %@", remotePath.lastPathComponent];
+        return NO;
+    }
+
+    const char *bytes = (const char *)fileData.bytes;
+    NSUInteger total = fileData.length;
+    NSUInteger offset = 0;
+
+    while (offset < total) {
+        uint32_t chunk = (uint32_t)MIN(total - offset, (NSUInteger)(256 * 1024));
+        uint32_t written = 0;
+        if (afc_file_write(afc, handle, bytes + offset, chunk, &written) != AFC_E_SUCCESS || written == 0) {
+            afc_file_close(afc, handle);
+            if (error) *error = @"写入设备文件失败";
+            return NO;
+        }
+        offset += written;
+    }
+
+    afc_file_close(afc, handle);
+    return YES;
+}
+
+- (BOOL)afcUploadDirectory:(NSString *)localDir
+              toRemotePath:(NSString *)remotePath
+                       afc:(afc_client_t)afc
+                     error:(NSString **)error
+{
+    // Create the .app directory on device
+    if (afc_make_directory(afc, remotePath.UTF8String) != AFC_E_SUCCESS) {
+        if (error) *error = [NSString stringWithFormat:@"无法创建设备目录: %@", remotePath.lastPathComponent];
+        return NO;
+    }
+
+    NSFileManager *fm = [NSFileManager defaultManager];
+    NSArray<NSString *> *contents = [fm contentsOfDirectoryAtPath:localDir error:nil];
+    if (!contents) {
+        if (error) *error = @"无法读取 .app 目录内容";
+        return NO;
+    }
+
+    for (NSString *item in contents) {
+        NSString *localItem = [localDir stringByAppendingPathComponent:item];
+        NSString *remoteItem = [remotePath stringByAppendingPathComponent:item];
+
+        BOOL isDir = NO;
+        [fm fileExistsAtPath:localItem isDirectory:&isDir];
+
+        if (isDir) {
+            if (![self afcUploadDirectory:localItem toRemotePath:remoteItem afc:afc error:error]) {
+                return NO;
+            }
+        } else {
+            if (![self afcUploadFile:localItem toRemotePath:remoteItem afc:afc error:error]) {
+                return NO;
+            }
+        }
+    }
+
+    return YES;
+}
+
+- (void)afcRemoveRemotePath:(NSString *)remotePath
+                     device:(idevice_t)device
+                   lockdown:(lockdownd_client_t)lockdown
+{
+    if (!remotePath) return;
+
+    lockdownd_service_descriptor_t svc = NULL;
+    afc_client_t afc = NULL;
+
+    if (lockdownd_start_service(lockdown, AFC_SERVICE_NAME, &svc) != LOCKDOWN_E_SUCCESS || !svc) return;
+    if (afc_client_new(device, svc, &afc) != AFC_E_SUCCESS) {
+        lockdownd_service_descriptor_free(svc);
+        return;
+    }
+    lockdownd_service_descriptor_free(svc);
+
+    afc_remove_path_and_contents(afc, remotePath.UTF8String);
+    afc_client_free(afc);
+}
+
+#pragma mark - instproxy Install Helper
+
+- (BOOL)instproxyInstall:(NSString *)remotePath
+             isDirectory:(BOOL)isDirectory
+                  device:(idevice_t)device
+                lockdown:(lockdownd_client_t)lockdown
+                   error:(NSString **)error
+{
+    lockdownd_service_descriptor_t svc = NULL;
+    instproxy_client_t ip = NULL;
+
+    if (lockdownd_start_service(lockdown, INSTPROXY_SERVICE_NAME, &svc) != LOCKDOWN_E_SUCCESS || !svc) {
+        if (error) *error = @"无法启动 installation_proxy 服务";
+        return NO;
+    }
+
+    if (instproxy_client_new(device, svc, &ip) != INSTPROXY_E_SUCCESS) {
+        lockdownd_service_descriptor_free(svc);
+        if (error) *error = @"无法创建 installation_proxy 客户端";
+        return NO;
+    }
+    lockdownd_service_descriptor_free(svc);
+
+    plist_t opts = NULL;
+    if (isDirectory) {
+        // .app bundle → Developer install
+        opts = instproxy_client_options_new();
+        instproxy_client_options_add(opts, "PackageType", "Developer", NULL);
+    }
+
+    instproxy_error_t ret = instproxy_install(ip, remotePath.UTF8String, opts, NULL, NULL);
+    BOOL success = (ret == INSTPROXY_E_SUCCESS);
+
+    if (!success && error) {
+        *error = [NSString stringWithFormat:@"安装失败 (code %d)", ret];
+    }
+
+    if (opts) instproxy_client_options_free(opts);
+    instproxy_client_free(ip);
+    return success;
 }
 
 @end

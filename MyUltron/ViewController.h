@@ -9,7 +9,7 @@
 
 @class MyUltronClient;
 
-@interface ViewController : NSViewController
+@interface ViewController : NSViewController <NSDraggingDestination>
 
 @property (nonatomic, strong) NSButton *deviceButton;
 @property (nonatomic, strong) NSButton *appButton;
@@ -19,6 +19,9 @@
 @property (nonatomic, copy) NSString *selectedUDID;
 @property (nonatomic, assign) BOOL selectedIsSimulator;
 @property (nonatomic, strong, readonly) MyUltronClient *client;
+
+// Drag-and-drop install
+- (void)installAppAtPath:(NSString *)path;
 
 @end
 
