@@ -3,6 +3,8 @@
 
 #import "Features/MessagePushViewController.h"
 #import "Features/DeviceScreenshotViewController.h"
+#import "Features/DeviceInfoViewController.h"
+#import "Features/AppListViewController.h"
 #import "Features/SandboxViewController.h"
 #import "Features/MMKVViewController.h"
 #import "Features/UserDefaultsViewController.h"
@@ -110,7 +112,7 @@
     [self.view addSubview:self.appButton];
 
     self.featureItems = @[
-        @"消息推送",@"设备截屏", @"沙盒管理",@"MMKV数据", @"UserDefault数据", @"数据库",
+        @"消息推送",@"设备信息", @"应用列表", @"设备截屏", @"沙盒管理",@"MMKV数据", @"UserDefault数据", @"数据库",
         @"网络监控", @"日志监控", @"埋点监控",
         @"IM会话监控", @"路由校验", @"环境切换",
         @"崩溃日志", @"热修复", @"灰度任务", @"编解码", @"解析日志文件"
@@ -496,6 +498,8 @@
 - (NSArray<Class> *)featureClasses {
     return @[
         [MessagePushViewController class],
+        [DeviceInfoViewController class],
+        [AppListViewController class],
         [DeviceScreenshotViewController class],
         [SandboxViewController class],
         [MMKVViewController class],
@@ -525,6 +529,9 @@
     NSArray *classes = [self featureClasses];
     Class cls = classes[index];
     FeatureViewController *vc = [[cls alloc] init];
+    if ([vc respondsToSelector:@selector(setDeviceUDID:)]) {
+        [(id)vc setDeviceUDID:self.selectedUDID];
+    }
     [self addChildViewController:vc];
     vc.view.frame = self.containerView.bounds;
     vc.view.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
