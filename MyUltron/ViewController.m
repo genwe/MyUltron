@@ -8,7 +8,7 @@
 #import "Features/SandboxViewController.h"
 #import "Features/MMKVViewController.h"
 #import "Features/UserDefaultsViewController.h"
-#import "Features/DatabaseViewController.h"
+#import "Features/SqliteViewController.h"
 #import "Features/NetworkMonitorViewController.h"
 #import "Features/LogMonitorViewController.h"
 #import "Features/AnalyticsMonitorViewController.h"
@@ -112,7 +112,7 @@
     [self.view addSubview:self.appButton];
 
     self.featureItems = @[
-        @"消息推送",@"设备信息", @"应用列表", @"设备截屏", @"沙盒管理",@"MMKV数据", @"UserDefault数据", @"数据库",
+        @"消息推送",@"设备信息", @"应用列表", @"设备截屏", @"沙盒管理",@"MMKV数据", @"UserDefault数据", @"Sqlite",
         @"网络监控", @"日志监控", @"埋点监控",
         @"IM会话监控", @"路由校验", @"环境切换",
         @"崩溃日志", @"热修复", @"灰度任务", @"编解码", @"解析日志文件"
@@ -504,7 +504,7 @@
         [SandboxViewController class],
         [MMKVViewController class],
         [UserDefaultsViewController class],
-        [DatabaseViewController class],
+        [SqliteViewController class],
         [NetworkMonitorViewController class],
         [LogMonitorViewController class],
         [AnalyticsMonitorViewController class],
