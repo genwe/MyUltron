@@ -203,20 +203,34 @@ static NSString * const kPrefFeatureConfig = @"MyUltronFeatureConfig";
     NSArray *saved = [[NSUserDefaults standardUserDefaults] arrayForKey:kPrefFeatureConfig];
     _featureConfig = [NSMutableArray array];
     BOOL loaded = NO;
-    if (saved && saved.count > 0) {
-        for (NSDictionary *d in saved) {
-            NSMutableDictionary *md = [d mutableCopy];
-            id classVal = md[@"class"];
-            // Restore class from string (handle both legacy Class objects and strings)
+    if (saved && [saved isKindOfClass:[NSArray class]] && saved.count > 0) {
+        for (id item in saved) {
+            if (![item isKindOfClass:[NSDictionary class]]) { loaded = NO; break; }
+            NSDictionary *d = (NSDictionary *)item;
+            NSMutableDictionary *md = [NSMutableDictionary dictionary];
+            
+            // Validate name
+            id nameVal = d[@"name"];
+            if (![nameVal isKindOfClass:[NSString class]]) { loaded = NO; break; }
+            md[@"name"] = nameVal;
+            
+            // Validate class
+            id classVal = d[@"class"];
+            Class cls = nil;
             if ([classVal isKindOfClass:[NSString class]]) {
-                Class cls = NSClassFromString(classVal);
-                if (cls) { md[@"class"] = cls; loaded = YES; }
-                else { loaded = NO; break; }
+                cls = NSClassFromString(classVal);
             } else if (classVal) {
-                loaded = YES; // Already a Class object
+                cls = classVal; // Legacy Class object
             }
-            if (![md[@"visible"] isKindOfClass:[NSNumber class]]) md[@"visible"] = @YES;
+            if (!cls) { loaded = NO; break; }
+            md[@"class"] = cls;
+            
+            // Validate visible
+            id visVal = d[@"visible"];
+            md[@"visible"] = [visVal isKindOfClass:[NSNumber class]] ? visVal : @YES;
+            
             [_featureConfig addObject:md];
+            loaded = YES;
         }
     }
     if (!loaded) {
@@ -234,11 +248,25 @@ static NSString * const kPrefFeatureConfig = @"MyUltronFeatureConfig";
     // Convert class objects to strings for plist serialization
     NSMutableArray *serializable = [NSMutableArray arrayWithCapacity:_featureConfig.count];
     for (NSDictionary *d in _featureConfig) {
-        NSMutableDictionary *sd = [d mutableCopy];
-        sd[@"class"] = NSStringFromClass(d[@"class"]);
+        NSMutableDictionary *sd = [NSMutableDictionary dictionary];
+        // Validate and copy only plist-safe values
+        id nameVal = d[@"name"];
+        if ([nameVal isKindOfClass:[NSString class]]) sd[@"name"] = nameVal;
+        else continue; // skip corrupted entries
+
+        id classVal = d[@"class"];
+        if (classVal) {
+            sd[@"class"] = NSStringFromClass(classVal);
+        } else continue;
+
+        id visVal = d[@"visible"];
+        sd[@"visible"] = [visVal isKindOfClass:[NSNumber class]] ? visVal : @YES;
+
         [serializable addObject:sd];
     }
-    [[NSUserDefaults standardUserDefaults] setObject:serializable forKey:kPrefFeatureConfig];
+    if (serializable.count > 0) {
+        [[NSUserDefaults standardUserDefaults] setObject:serializable forKey:kPrefFeatureConfig];
+    }
     [self rebuildFeatureArrays];
     [self.tableView reloadData];
 }

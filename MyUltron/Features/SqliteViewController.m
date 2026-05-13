@@ -242,9 +242,14 @@
         cell.textField = tf;
     }
     NSInteger colIdx = [_columns indexOfObject:col.identifier];
-    if (colIdx != NSNotFound && colIdx < (NSInteger)_rows[row].count) {
-        id val = _rows[row][colIdx];
-        cell.textField.stringValue = [val isKindOfClass:[NSNull class]] ? @"NULL" : [val description];
+    if (row >= 0 && row < (NSInteger)_rows.count) {
+        NSArray *r = _rows[row];
+        if (colIdx != NSNotFound && colIdx < (NSInteger)r.count) {
+            id val = r[colIdx];
+            cell.textField.stringValue = [val isKindOfClass:[NSNull class]] ? @"NULL" : [val description];
+        } else {
+            cell.textField.stringValue = @"";
+        }
     } else {
         cell.textField.stringValue = @"";
     }
@@ -258,15 +263,24 @@
     NSInteger col = [_tableView columnForView:sender];
     if (row < 0 || col < 0) return;
     if (row >= (NSInteger)_rows.count) return;
-    if (col >= (NSInteger)_rows[row].count) return;
+    NSArray *rowData = _rows[row];
+    if (col >= (NSInteger)rowData.count) return;
     if (col >= (NSInteger)_columns.count) return;
+
+    // Use id column (column 0) as the row identifier for UPDATE
+    id rowId = rowData.firstObject;
+    if ([rowId isKindOfClass:[NSNull class]] || !rowId) {
+        _statusLabel.stringValue = @"无法获取行标识";
+        return;
+    }
 
     NSString *newVal = sender.stringValue;
     _rows[row][col] = newVal;
 
     NSString *colName = _columns[col];
-    NSString *sql = [NSString stringWithFormat:@"UPDATE \"%@\" SET \"%@\" = '%@' WHERE rowid = %ld",
-                     _selectedTable, colName, [newVal stringByReplacingOccurrencesOfString:@"'" withString:@"''"], (long)row + 1];
+    NSString *escaped = [newVal stringByReplacingOccurrencesOfString:@"'" withString:@"''"];
+    NSString *sql = [NSString stringWithFormat:@"UPDATE \"%@\" SET \"%@\" = '%@' WHERE %@ = %@",
+                     _selectedTable, colName, escaped, _columns[0], rowId];
     [self sendMessage:@{@"messageType": @"sqliteExecute", @"version": @"1.0",
                         @"content": @{@"database": _selectedDB ?: @"", @"sql": sql}}];
 }
@@ -298,23 +312,35 @@
 - (void)addRow:(id)sender {
     if (!_selectedTable || _columns.count == 0) return;
 
+    // Filter out auto-increment id column for INSERT
+    NSMutableArray<NSString *> *insertCols = [NSMutableArray array];
+    for (NSString *col in _columns) {
+        if ([col compare:@"id" options:NSCaseInsensitiveSearch] != NSOrderedSame) {
+            [insertCols addObject:col];
+        }
+    }
+    if (insertCols.count == 0) {
+        _statusLabel.stringValue = @"该表无可插入字段";
+        return;
+    }
+
     NSAlert *alert = [[NSAlert alloc] init];
     alert.messageText = @"新增数据行";
     alert.informativeText = [NSString stringWithFormat:@"表: %@", _selectedTable];
     [alert addButtonWithTitle:@"保存"];
     [alert addButtonWithTitle:@"取消"];
 
-    NSView *form = [[NSView alloc] initWithFrame:NSMakeRect(0, 0, 300, _columns.count * 30 + 10)];
+    NSView *form = [[NSView alloc] initWithFrame:NSMakeRect(0, 0, 300, insertCols.count * 30 + 10)];
     NSMutableArray<NSTextField *> *fields = [NSMutableArray array];
-    for (NSUInteger i = 0; i < _columns.count; i++) {
+    for (NSUInteger i = 0; i < insertCols.count; i++) {
         NSTextField *label = [[NSTextField alloc] initWithFrame:NSMakeRect(0, i * 30 + 5, 80, 22)];
         label.editable = NO; label.bordered = NO; label.drawsBackground = NO;
-        label.stringValue = _columns[i];
+        label.stringValue = insertCols[i];
         label.font = [NSFont boldSystemFontOfSize:12];
         [form addSubview:label];
 
         NSTextField *field = [[NSTextField alloc] initWithFrame:NSMakeRect(88, i * 30 + 2, 200, 24)];
-        field.placeholderString = [NSString stringWithFormat:@"输入 %@ …", _columns[i]];
+        field.placeholderString = [NSString stringWithFormat:@"输入 %@ …", insertCols[i]];
         [form addSubview:field];
         [fields addObject:field];
     }
@@ -328,7 +354,7 @@
             NSString *escaped = [f.stringValue stringByReplacingOccurrencesOfString:@"'" withString:@"''"];
             [vals addObject:[NSString stringWithFormat:@"'%@'", escaped]];
         }
-        NSString *cols = [_columns componentsJoinedByString:@", "];
+        NSString *cols = [insertCols componentsJoinedByString:@", "];
         NSString *sql = [NSString stringWithFormat:@"INSERT INTO \"%@\" (%@) VALUES (%@)",
                          _selectedTable, cols, [vals componentsJoinedByString:@", "]];
         [self sendMessage:@{@"messageType": @"sqliteExecute", @"version": @"1.0",
@@ -349,7 +375,13 @@
 
     [alert beginSheetModalForWindow:self.view.window completionHandler:^(NSModalResponse code) {
         if (code != NSAlertFirstButtonReturn) return;
-        NSString *sql = [NSString stringWithFormat:@"DELETE FROM \"%@\" WHERE rowid = %ld", _selectedTable, (long)row + 1];
+        // Use id column (column 0) as the row identifier for DELETE
+        id rowId = _rows[row].firstObject;
+        if ([rowId isKindOfClass:[NSNull class]] || !rowId) {
+            _statusLabel.stringValue = @"无法获取行标识";
+            return;
+        }
+        NSString *sql = [NSString stringWithFormat:@"DELETE FROM \"%@\" WHERE %@ = %@", _selectedTable, _columns[0], rowId];
         [self sendMessage:@{@"messageType": @"sqliteExecute", @"version": @"1.0",
                             @"content": @{@"database": _selectedDB ?: @"", @"sql": sql}}];
     }];
