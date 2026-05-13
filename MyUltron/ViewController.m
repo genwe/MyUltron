@@ -177,7 +177,6 @@ static NSString * const kPrefFeatureConfig = @"MyUltronFeatureConfig";
 
 - (NSArray<NSDictionary *> *)defaultFeatureConfig {
     return @[
-        @{@"name": @"消息推送",      @"class": [MessagePushViewController class]},
         @{@"name": @"设备信息",      @"class": [DeviceInfoViewController class]},
         @{@"name": @"应用列表",      @"class": [AppListViewController class]},
         @{@"name": @"设备截屏",      @"class": [DeviceScreenshotViewController class]},
@@ -185,6 +184,8 @@ static NSString * const kPrefFeatureConfig = @"MyUltronFeatureConfig";
         @{@"name": @"MMKV数据",      @"class": [MMKVViewController class]},
         @{@"name": @"UserDefault数据",@"class": [UserDefaultsViewController class]},
         @{@"name": @"SQLite浏览器",   @"class": [SqliteViewController class]},
+        @{@"name": @"编解码",        @"class": [CodecViewController class]},
+        @{@"name": @"消息推送",      @"class": [MessagePushViewController class]},
         @{@"name": @"网络监控",      @"class": [NetworkMonitorViewController class]},
         @{@"name": @"日志监控",      @"class": [LogMonitorViewController class]},
         @{@"name": @"埋点监控",      @"class": [AnalyticsMonitorViewController class]},
@@ -194,7 +195,6 @@ static NSString * const kPrefFeatureConfig = @"MyUltronFeatureConfig";
         @{@"name": @"崩溃日志",      @"class": [CrashLogViewController class]},
         @{@"name": @"热修复",        @"class": [HotfixViewController class]},
         @{@"name": @"灰度任务",      @"class": [GrayscaleTaskViewController class]},
-        @{@"name": @"编解码",        @"class": [CodecViewController class]},
         @{@"name": @"解析日志文件",   @"class": [XlogParserViewController class]},
     ];
 }
