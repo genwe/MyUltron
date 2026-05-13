@@ -689,10 +689,10 @@
         dispatch_async(dispatch_get_main_queue(), ^{
             if (success) {
                 [self showToast:[NSString stringWithFormat:@"%@ 安装成功", fileName]];
-                NSLog(@"[MyUltron] Install succeeded: %@", fileName);
+                NSLog(@"[Install] SUCCESS: %@ on device %@", fileName, self.selectedUDID);
             } else {
                 [self showToast:[NSString stringWithFormat:@"安装失败: %@", errorMsg ?: @"未知错误"]];
-                NSLog(@"[MyUltron] Install failed: %@ — %@", fileName, errorMsg);
+                NSLog(@"[Install] FAILED: %@ — %@ (device: %@)", fileName, errorMsg, self.selectedUDID);
             }
         });
     });
@@ -746,10 +746,12 @@
     // 3. Upload file via AFC
     NSString *remotePath = nil;
     if (![self afcUpload:localPath isDirectory:isDirectory device:device lockdown:lockdown remotePath:&remotePath error:error]) {
+        NSLog(@"[Install] AFC upload failed: %@", error ? *error : @"unknown");
         lockdownd_client_free(lockdown);
         idevice_free(device);
         return NO;
     }
+    NSLog(@"[Install] AFC upload complete → %@", remotePath);
 
     // 4. Install via installation_proxy
     BOOL success = [self instproxyInstall:remotePath isDirectory:isDirectory device:device lockdown:lockdown error:error];
@@ -898,6 +900,27 @@
 
 #pragma mark - instproxy Install Helper
 
+typedef struct { BOOL done; NSString * __strong errMsg; } InstallCtx;
+
+static void instproxy_status_callback(plist_t command, plist_t status, void *user_data) {
+    if (!status) return;
+    InstallCtx *ctx = (InstallCtx *)user_data;
+
+    plist_t completeNode = plist_dict_get_item(status, "Status");
+    if (completeNode) {
+        char *s = NULL; plist_get_string_val(completeNode, &s);
+        if (s) {
+            if (strcmp(s, "Complete") == 0) ctx->done = YES;
+            free(s);
+        }
+    }
+    plist_t errNode = plist_dict_get_item(status, "Error");
+    if (errNode) {
+        char *e = NULL; plist_get_string_val(errNode, &e);
+        if (e) { ctx->errMsg = @(e); free(e); }
+    }
+}
+
 - (BOOL)instproxyInstall:(NSString *)remotePath
              isDirectory:(BOOL)isDirectory
                   device:(idevice_t)device
@@ -921,18 +944,31 @@
 
     plist_t opts = NULL;
     if (isDirectory) {
-        // .app bundle → Developer install
         opts = instproxy_client_options_new();
         instproxy_client_options_add(opts, "PackageType", "Developer", NULL);
     }
 
-    instproxy_error_t ret = instproxy_install(ip, remotePath.UTF8String, opts, NULL, NULL);
-    BOOL success = (ret == INSTPROXY_E_SUCCESS);
-
-    if (!success && error) {
-        *error = [NSString stringWithFormat:@"安装失败 (code %d)", ret];
+    // Use status callback to properly track install completion
+    InstallCtx ctx = { NO, nil };
+    instproxy_error_t ret = instproxy_install(ip, remotePath.UTF8String, opts,
+                                               instproxy_status_callback, &ctx);
+    if (ret != INSTPROXY_E_SUCCESS) {
+        if (error) *error = [NSString stringWithFormat:@"安装请求失败 (code %d)", ret];
+        if (opts) instproxy_client_options_free(opts);
+        instproxy_client_free(ip);
+        return NO;
     }
 
+    // Poll until install completes or times out (60s max)
+    NSDate *deadline = [NSDate dateWithTimeIntervalSinceNow:60];
+    while (!ctx.done && [deadline timeIntervalSinceNow] > 0) {
+        [[NSRunLoop currentRunLoop] runMode:NSDefaultRunLoopMode beforeDate:[NSDate dateWithTimeIntervalSinceNow:0.5]];
+    }
+
+    BOOL success = ctx.done && !ctx.errMsg;
+    if (!success && error) {
+        *error = ctx.errMsg ?: @"安装超时或失败";
+    }
     if (opts) instproxy_client_options_free(opts);
     instproxy_client_free(ip);
     return success;
