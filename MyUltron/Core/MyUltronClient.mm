@@ -8,6 +8,7 @@
 
 #import "MyUltronClient.h"
 #import "MyUltronPacketBuilder.h"
+#include <libimobiledevice/libimobiledevice.h>
 
 static NSString * const kMsgKeyType    = @"messageType";
 static NSString * const kMsgKeyVersion = @"version";
@@ -21,6 +22,7 @@ static NSString * const kMsgKeyContent = @"content";
 @property (nonatomic, assign) MyUltronPacketBuilder *builder;
 @property (nonatomic, strong) NSMutableData   *readBuffer;
 @property (nonatomic, assign) BOOL             isConnected;
+@property (nonatomic, assign) idevice_connection_t deviceConnection;
 
 @end
 
@@ -81,6 +83,71 @@ static NSString * const kMsgKeyContent = @"content";
     NSLog(@"[MyUltron] Connecting to %@:%u ...", host, port);
 }
 
+- (void)connectToDeviceUDID:(NSString *)udid port:(uint16_t)port {
+    [self disconnect];
+
+    // 1. Open device handle via usbmuxd
+    idevice_t device = NULL;
+    idevice_error_t ret = idevice_new_with_options(&device, udid.UTF8String, IDEVICE_LOOKUP_USBMUX);
+    if (ret != IDEVICE_E_SUCCESS) {
+        NSLog(@"[MyUltron] Failed to open device %@: idevice error %d", udid, ret);
+        return;
+    }
+
+    // 2. Connect to the TCP port on the device
+    idevice_connection_t conn = NULL;
+    ret = idevice_connect(device, port, &conn);
+    idevice_free(device);
+    device = NULL;
+
+    if (ret != IDEVICE_E_SUCCESS) {
+        NSLog(@"[MyUltron] Failed to connect to device %@:%u — idevice error %d", udid, port, ret);
+        return;
+    }
+
+    // 3. Get the native socket fd from the connection
+    int sock = -1;
+    ret = idevice_connection_get_fd(conn, &sock);
+    if (ret != IDEVICE_E_SUCCESS || sock < 0) {
+        NSLog(@"[MyUltron] Failed to get socket fd from device connection");
+        idevice_disconnect(conn);
+        return;
+    }
+
+    self.deviceConnection = conn;
+
+    // 4. Wrap the native socket in CFStreams (same NSStream path as connectToHost:)
+    CFReadStreamRef  read  = NULL;
+    CFWriteStreamRef write = NULL;
+    CFStreamCreatePairWithSocket(kCFAllocatorDefault, sock, &read, &write);
+
+    if (!read || !write) {
+        NSLog(@"[MyUltron] Failed to create streams from device socket");
+        idevice_disconnect(conn);
+        self.deviceConnection = NULL;
+        return;
+    }
+
+    self.inputStream  = CFBridgingRelease(read);
+    self.outputStream = CFBridgingRelease(write);
+
+    self.inputStream.delegate  = self;
+    self.outputStream.delegate = self;
+
+    CFReadStreamSetProperty(read, kCFStreamPropertyShouldCloseNativeSocket, kCFBooleanTrue);
+    CFWriteStreamSetProperty(write, kCFStreamPropertyShouldCloseNativeSocket, kCFBooleanTrue);
+
+    [self.inputStream  scheduleInRunLoop:[NSRunLoop mainRunLoop]
+                                 forMode:NSDefaultRunLoopMode];
+    [self.outputStream scheduleInRunLoop:[NSRunLoop mainRunLoop]
+                                 forMode:NSDefaultRunLoopMode];
+
+    [self.inputStream  open];
+    [self.outputStream open];
+
+    NSLog(@"[MyUltron] Connecting to device %@:%u via usbmuxd ...", udid, port);
+}
+
 - (void)disconnect {
     NSInputStream  *inStream  = self.inputStream;
     NSOutputStream *outStream = self.outputStream;
@@ -100,6 +167,12 @@ static NSString * const kMsgKeyContent = @"content";
 
     self.inputStream  = nil;
     self.outputStream = nil;
+
+    // Clean up libimobiledevice connection (safe to call even if already closed by CFStream)
+    if (self.deviceConnection) {
+        idevice_disconnect(self.deviceConnection);
+        self.deviceConnection = NULL;
+    }
 
     if (self.isConnected) {
         self.isConnected = NO;

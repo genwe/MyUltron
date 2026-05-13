@@ -85,8 +85,7 @@
 
 // Connection layer
 @property (nonatomic, strong, readwrite) MyUltronClient *client;
-@property (nonatomic, strong) NSTask        *iproxyTask;
-@property (nonatomic, assign) uint16_t       serverPort;  // 62345 release / 72345 debug
+@property (nonatomic, assign) uint16_t       serverPort;  // 62345
 @end
 
 @implementation ViewController
@@ -114,7 +113,7 @@
         @"消息推送",@"设备截屏", @"沙盒管理",@"MMKV数据", @"UserDefault数据", @"数据库",
         @"网络监控", @"日志监控", @"埋点监控",
         @"IM会话监控", @"路由校验", @"环境切换",
-        @"崩溃日志", @"热修复", @"灰度任务", @"编解码", @"解析xlog"
+        @"崩溃日志", @"热修复", @"灰度任务", @"编解码", @"解析日志文件"
     ];
 
     CGFloat listTop = self.view.bounds.size.height - 52;
@@ -402,7 +401,6 @@
 
 - (void)connectToDeviceServer {
     [self.client disconnect];
-    [self stopIproxy];
 
     // Always read the latest port from Preferences
     self.serverPort = [AppDelegate serverPort];
@@ -410,59 +408,8 @@
     if (self.selectedIsSimulator) {
         [self.client connectToHost:@"127.0.0.1" port:self.serverPort];
     } else {
-        [self startIproxyAndConnect];
+        [self.client connectToDeviceUDID:self.selectedUDID port:self.serverPort];
     }
-}
-
-- (void)startIproxyAndConnect {
-    NSString *iproxyPath = @"/usr/local/bin/iproxy";
-    if (![[NSFileManager defaultManager] isExecutableFileAtPath:iproxyPath]) {
-        iproxyPath = @"/opt/homebrew/bin/iproxy";
-    }
-    if (![[NSFileManager defaultManager] isExecutableFileAtPath:iproxyPath]) {
-        NSLog(@"[MyUltron] iproxy not found — install libimobiledevice");
-        [self showToast:@"未找到 iproxy，请安装 libimobiledevice"];
-        return;
-    }
-
-    // Always read the latest port from Preferences
-    self.serverPort = [AppDelegate serverPort];
-    uint16_t localPort  = self.serverPort;
-    uint16_t remotePort = self.serverPort;
-
-    NSTask *task = [[NSTask alloc] init];
-    task.executableURL = [NSURL fileURLWithPath:iproxyPath];
-    task.arguments = @[
-        [NSString stringWithFormat:@"%u", localPort],
-        [NSString stringWithFormat:@"%u", remotePort],
-        self.selectedUDID ?: @""
-    ];
-    task.standardOutput = [NSPipe pipe];
-    task.standardError  = [NSPipe pipe];
-
-    NSError *err = nil;
-    if (![task launchAndReturnError:&err]) {
-        NSLog(@"[MyUltron] iproxy launch failed: %@", err);
-        return;
-    }
-
-    self.iproxyTask = task;
-    NSLog(@"[MyUltron] iproxy started: %u → device %@:%u",
-          localPort, self.selectedUDID, remotePort);
-
-    // Give iproxy a moment to bind, then connect
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.0 * NSEC_PER_SEC)),
-                   dispatch_get_main_queue(), ^{
-        [self.client connectToHost:@"127.0.0.1" port:localPort];
-    });
-}
-
-- (void)stopIproxy {
-    if (self.iproxyTask && self.iproxyTask.isRunning) {
-        [self.iproxyTask terminate];
-        NSLog(@"[MyUltron] iproxy stopped");
-    }
-    self.iproxyTask = nil;
 }
 
 #pragma mark - MyUltronClientDelegate
@@ -533,15 +480,13 @@
 
     NSArray *classes = [self featureClasses];
     Class cls = classes[row];
-    if ([cls requiresConnection]) {
-        if (!self.selectedUDID) {
-            [self showToast:@"请选择连接设备"];
-            return;
-        }
-        if ([self.appButton.title isEqualToString:@"请选择应用"]) {
-            [self showToast:@"请选择应用"];
-            return;
-        }
+    if ([cls requiresConnection] && !self.selectedUDID) {
+        [self showToast:@"请选择连接设备"];
+        return;
+    }
+    if ([cls requiresApp] && [self.appButton.title isEqualToString:@"请选择应用"]) {
+        [self showToast:@"请选择应用"];
+        return;
     }
 
     NSLog(@"[Ultron] 选中功能: %@", self.featureItems[row]);

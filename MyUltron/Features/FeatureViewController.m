@@ -12,6 +12,7 @@
 @implementation FeatureViewController
 
 + (BOOL)requiresConnection { return YES; }
++ (BOOL)requiresApp      { return YES; }
 
 - (instancetype)initWithFeatureName:(NSString *)featureName {
     self = [super initWithNibName:nil bundle:nil];

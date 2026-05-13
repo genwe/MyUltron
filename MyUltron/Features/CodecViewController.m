@@ -20,6 +20,7 @@
 @implementation CodecViewController
 
 + (BOOL)requiresConnection { return NO; }
++ (BOOL)requiresApp      { return NO; }
 
 - (instancetype)init {
     return [super initWithFeatureName:@"编解码"];

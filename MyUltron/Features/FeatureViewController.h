@@ -24,4 +24,8 @@
 /// (e.g. Codec). Default is YES.
 + (BOOL)requiresConnection;
 
+/// Override to return NO for features that work without a selected app
+/// (e.g. DeviceScreenshot). Default is YES.
++ (BOOL)requiresApp;
+
 @end

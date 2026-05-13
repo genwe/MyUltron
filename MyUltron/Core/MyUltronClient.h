@@ -47,6 +47,9 @@ NS_ASSUME_NONNULL_BEGIN
 /// Connect directly to host:port (e.g. localhost:62345 for simulators).
 - (void)connectToHost:(NSString *)host port:(uint16_t)port;
 
+/// Connect to MyUltronServer on an iOS device via usbmuxd (no external iproxy needed).
+- (void)connectToDeviceUDID:(NSString *)udid port:(uint16_t)port;
+
 /// Disconnect.
 - (void)disconnect;
 
