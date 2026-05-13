@@ -81,9 +81,18 @@
 
 // MARK: - ViewController
 
+static NSString * const kPrefFeatureConfig = @"MyUltronFeatureConfig";
+
 @interface ViewController () <NSTableViewDataSource, NSTableViewDelegate, MyUltronClientDelegate>
-@property (nonatomic, strong) NSArray<NSString *> *featureItems;
+@property (nonatomic, strong) NSMutableArray<NSString *> *featureItems;
+@property (nonatomic, strong) NSMutableArray<Class>     *featureClasses;
 @property (nonatomic, strong) FeatureViewController *currentFeatureVC;
+
+// Settings
+@property (nonatomic, strong) NSButton *settingsButton;
+@property (nonatomic, strong) NSMutableArray<NSMutableDictionary *> *featureConfig;
+@property (nonatomic, strong) NSMutableArray<NSMutableDictionary *> *settingsEditConfig;
+@property (nonatomic, weak)   NSView *settingsContentView;
 
 // Connection layer
 @property (nonatomic, strong, readwrite) MyUltronClient *client;
@@ -111,12 +120,17 @@
     self.appButton.autoresizingMask = NSViewMaxXMargin | NSViewMinYMargin;
     [self.view addSubview:self.appButton];
 
-    self.featureItems = @[
-        @"消息推送",@"设备信息", @"应用列表", @"设备截屏", @"沙盒管理",@"MMKV数据", @"UserDefault数据", @"Sqlite",
-        @"网络监控", @"日志监控", @"埋点监控",
-        @"IM会话监控", @"路由校验", @"环境切换",
-        @"崩溃日志", @"热修复", @"灰度任务", @"编解码", @"解析日志文件"
-    ];
+    // Settings gear button (top-right)
+    self.settingsButton = [NSButton buttonWithTitle:@"⚙" target:self action:@selector(openFeatureSettings:)];
+    self.settingsButton.bezelStyle = NSBezelStyleRounded;
+    self.settingsButton.frame = NSMakeRect(self.view.bounds.size.width - 42,
+                                            self.view.bounds.size.height - 40, 32, 28);
+    self.settingsButton.autoresizingMask = NSViewMinXMargin | NSViewMinYMargin;
+    self.settingsButton.font = [NSFont systemFontOfSize:18];
+    [self.view addSubview:self.settingsButton];
+
+    // Init feature config & rebuild sidebar
+    [self loadFeatureConfig];
 
     CGFloat listTop = self.view.bounds.size.height - 52;
     NSScrollView *scrollView = [[NSScrollView alloc] initWithFrame:NSMakeRect(16, 20, 200, listTop - 20)];
@@ -157,6 +171,87 @@
     self.serverPort = [AppDelegate serverPort];
     self.client = [[MyUltronClient alloc] init];
     self.client.delegate = self;
+}
+
+#pragma mark - Feature Config
+
+- (NSArray<NSDictionary *> *)defaultFeatureConfig {
+    return @[
+        @{@"name": @"消息推送",      @"class": [MessagePushViewController class]},
+        @{@"name": @"设备信息",      @"class": [DeviceInfoViewController class]},
+        @{@"name": @"应用列表",      @"class": [AppListViewController class]},
+        @{@"name": @"设备截屏",      @"class": [DeviceScreenshotViewController class]},
+        @{@"name": @"沙盒管理",      @"class": [SandboxViewController class]},
+        @{@"name": @"MMKV数据",      @"class": [MMKVViewController class]},
+        @{@"name": @"UserDefault数据",@"class": [UserDefaultsViewController class]},
+        @{@"name": @"SQLite浏览器",   @"class": [SqliteViewController class]},
+        @{@"name": @"网络监控",      @"class": [NetworkMonitorViewController class]},
+        @{@"name": @"日志监控",      @"class": [LogMonitorViewController class]},
+        @{@"name": @"埋点监控",      @"class": [AnalyticsMonitorViewController class]},
+        @{@"name": @"IM会话监控",    @"class": [IMSessionViewController class]},
+        @{@"name": @"路由校验",      @"class": [RouteValidationViewController class]},
+        @{@"name": @"环境切换",      @"class": [EnvironmentSwitchViewController class]},
+        @{@"name": @"崩溃日志",      @"class": [CrashLogViewController class]},
+        @{@"name": @"热修复",        @"class": [HotfixViewController class]},
+        @{@"name": @"灰度任务",      @"class": [GrayscaleTaskViewController class]},
+        @{@"name": @"编解码",        @"class": [CodecViewController class]},
+        @{@"name": @"解析日志文件",   @"class": [XlogParserViewController class]},
+    ];
+}
+
+- (void)loadFeatureConfig {
+    NSArray *saved = [[NSUserDefaults standardUserDefaults] arrayForKey:kPrefFeatureConfig];
+    _featureConfig = [NSMutableArray array];
+    BOOL loaded = NO;
+    if (saved && saved.count > 0) {
+        for (NSDictionary *d in saved) {
+            NSMutableDictionary *md = [d mutableCopy];
+            id classVal = md[@"class"];
+            // Restore class from string (handle both legacy Class objects and strings)
+            if ([classVal isKindOfClass:[NSString class]]) {
+                Class cls = NSClassFromString(classVal);
+                if (cls) { md[@"class"] = cls; loaded = YES; }
+                else { loaded = NO; break; }
+            } else if (classVal) {
+                loaded = YES; // Already a Class object
+            }
+            if (![md[@"visible"] isKindOfClass:[NSNumber class]]) md[@"visible"] = @YES;
+            [_featureConfig addObject:md];
+        }
+    }
+    if (!loaded) {
+        [[NSUserDefaults standardUserDefaults] removeObjectForKey:kPrefFeatureConfig];
+        [_featureConfig removeAllObjects];
+        for (NSDictionary *d in [self defaultFeatureConfig]) {
+            [_featureConfig addObject:[NSMutableDictionary dictionaryWithDictionary:d]];
+            _featureConfig.lastObject[@"visible"] = @YES;
+        }
+    }
+    [self rebuildFeatureArrays];
+}
+
+- (void)saveFeatureConfig {
+    // Convert class objects to strings for plist serialization
+    NSMutableArray *serializable = [NSMutableArray arrayWithCapacity:_featureConfig.count];
+    for (NSDictionary *d in _featureConfig) {
+        NSMutableDictionary *sd = [d mutableCopy];
+        sd[@"class"] = NSStringFromClass(d[@"class"]);
+        [serializable addObject:sd];
+    }
+    [[NSUserDefaults standardUserDefaults] setObject:serializable forKey:kPrefFeatureConfig];
+    [self rebuildFeatureArrays];
+    [self.tableView reloadData];
+}
+
+- (void)rebuildFeatureArrays {
+    _featureItems = [NSMutableArray array];
+    _featureClasses = [NSMutableArray array];
+    for (NSDictionary *d in _featureConfig) {
+        if ([d[@"visible"] boolValue]) {
+            [_featureItems addObject:d[@"name"]];
+            [_featureClasses addObject:d[@"class"]];
+        }
+    }
 }
 
 - (void)showDeviceMenu:(NSButton *)sender {
@@ -452,29 +547,30 @@
 
 #pragma mark - Table view
 
-- (NSInteger)numberOfRowsInTableView:(NSTableView *)tableView {
+- (NSInteger)numberOfRowsInTableView:(NSTableView *)tv {
     return self.featureItems.count;
 }
 
-- (NSView *)tableView:(NSTableView *)tableView viewForTableColumn:(NSTableColumn *)tableColumn row:(NSInteger)row {
-    NSTableCellView *cell = [tableView makeViewWithIdentifier:@"featureCell" owner:self];
+- (NSView *)tableView:(NSTableView *)tv viewForTableColumn:(NSTableColumn *)col row:(NSInteger)row {
+    // Sidebar only (settings table uses cell-based)
+    NSTableCellView *cell = [tv makeViewWithIdentifier:@"featureCell" owner:self];
     if (!cell) {
         cell = [[NSTableCellView alloc] initWithFrame:NSZeroRect];
         cell.identifier = @"featureCell";
         NSTextField *tf = [[NSTextField alloc] initWithFrame:NSZeroRect];
-        tf.editable = NO;
-        tf.bordered = NO;
-        tf.drawsBackground = NO;
+        tf.editable = NO; tf.bordered = NO; tf.drawsBackground = NO;
         tf.font = [NSFont systemFontOfSize:13];
         tf.lineBreakMode = NSLineBreakByTruncatingTail;
         [cell addSubview:tf];
         cell.textField = tf;
     }
     cell.textField.stringValue = self.featureItems[row];
-    CGFloat rowH = tableView.rowHeight;
-    cell.textField.frame = NSMakeRect(8, (rowH - 16) / 2, tableColumn.width - 16, 16);
+    CGFloat rowH = tv.rowHeight;
+    cell.textField.frame = NSMakeRect(8, (rowH - 16) / 2, col.width - 16, 16);
     return cell;
 }
+
+- (CGFloat)tableView:(NSTableView *)tv heightOfRow:(NSInteger)row { return 24; }
 
 - (void)tableViewSelectionDidChange:(NSNotification *)notification {
     NSInteger row = self.tableView.selectedRow;
@@ -495,28 +591,135 @@
     [self showFeatureAtIndex:row];
 }
 
-- (NSArray<Class> *)featureClasses {
-    return @[
-        [MessagePushViewController class],
-        [DeviceInfoViewController class],
-        [AppListViewController class],
-        [DeviceScreenshotViewController class],
-        [SandboxViewController class],
-        [MMKVViewController class],
-        [UserDefaultsViewController class],
-        [SqliteViewController class],
-        [NetworkMonitorViewController class],
-        [LogMonitorViewController class],
-        [AnalyticsMonitorViewController class],
-        [IMSessionViewController class],
-        [RouteValidationViewController class],
-        [EnvironmentSwitchViewController class],
-        [CrashLogViewController class],
-        [HotfixViewController class],
-        [GrayscaleTaskViewController class],
-        [CodecViewController class],
-        [XlogParserViewController class]
-    ];
+#pragma mark - Settings Dialog
+
+- (void)openFeatureSettings:(NSButton *)sender {
+    NSMutableArray<NSMutableDictionary *> *editConfig = [NSMutableArray array];
+    for (NSDictionary *d in _featureConfig) {
+        [editConfig addObject:[NSMutableDictionary dictionaryWithDictionary:d]];
+    }
+
+    CGFloat rowH = 26;
+    NSUInteger n = editConfig.count;
+    CGFloat contentH = n * rowH;
+
+    NSScrollView *sv = [[NSScrollView alloc] initWithFrame:NSMakeRect(0, 0, 310, 380)];
+    sv.borderType = NSBezelBorder; sv.hasVerticalScroller = YES;
+    sv.autohidesScrollers = YES;
+
+    NSView *contentView = [[NSView alloc] initWithFrame:NSMakeRect(0, 0, 290, contentH)];
+
+    for (NSUInteger i = 0; i < n; i++) {
+        NSDictionary *d = editConfig[i];
+        CGFloat y = contentH - (i + 1) * rowH;
+
+        // Toggle
+        NSButton *cb = [[NSButton alloc] initWithFrame:NSMakeRect(4, y + 5, 16, 16)];
+        [cb setButtonType:NSButtonTypeSwitch];
+        cb.title = @"";
+        cb.state = [d[@"visible"] boolValue] ? NSControlStateValueOn : NSControlStateValueOff;
+        cb.tag = i;
+        cb.target = self;
+        cb.action = @selector(settingsCheckToggled:);
+        [contentView addSubview:cb];
+
+        // Name
+        NSTextField *label = [[NSTextField alloc] initWithFrame:NSMakeRect(24, y + 3, 200, 20)];
+        label.stringValue = d[@"name"];
+        label.editable = NO; label.bordered = NO; label.drawsBackground = NO;
+        label.font = [NSFont systemFontOfSize:13];
+        [contentView addSubview:label];
+
+        // Move up
+        NSButton *up = [NSButton buttonWithTitle:@"▲" target:self action:@selector(settingsMoveUp:)];
+        up.frame = NSMakeRect(230, y + 3, 24, 18);
+        up.bezelStyle = NSBezelStyleSmallSquare; up.font = [NSFont systemFontOfSize:9]; up.tag = i;
+        [contentView addSubview:up];
+
+        // Move down
+        NSButton *dn = [NSButton buttonWithTitle:@"▼" target:self action:@selector(settingsMoveDown:)];
+        dn.frame = NSMakeRect(256, y + 3, 24, 18);
+        dn.bezelStyle = NSBezelStyleSmallSquare; dn.font = [NSFont systemFontOfSize:9]; dn.tag = i;
+        [contentView addSubview:dn];
+    }
+
+    sv.documentView = contentView;
+    [contentView scrollPoint:NSMakePoint(0, contentH)];
+
+    _settingsContentView = contentView;
+    _settingsEditConfig = editConfig;
+
+    NSAlert *alert = [[NSAlert alloc] init];
+    alert.messageText = @"功能列表设置";
+    alert.informativeText = @"☑ 勾选控制侧边栏可见";
+    [alert addButtonWithTitle:@"保存"];
+    [alert addButtonWithTitle:@"取消"];
+    alert.accessoryView = sv;
+
+    [alert beginSheetModalForWindow:self.view.window completionHandler:^(NSModalResponse code) {
+        if (code != NSAlertFirstButtonReturn) { _settingsEditConfig = nil; return; }
+        _featureConfig = editConfig;
+        _settingsEditConfig = nil;
+        [self saveFeatureConfig];
+    }];
+}
+
+- (void)settingsCheckToggled:(NSButton *)cb {
+    if (!_settingsEditConfig) return;
+    NSInteger i = cb.tag;
+    if (i < 0 || i >= (NSInteger)_settingsEditConfig.count) return;
+    _settingsEditConfig[i][@"visible"] = @(cb.state == NSControlStateValueOn);
+}
+
+- (void)settingsMoveUp:(NSButton *)btn {
+    if (!_settingsEditConfig) return;
+    NSInteger i = btn.tag;
+    if (i <= 0 || i >= (NSInteger)_settingsEditConfig.count) return;
+    [_settingsEditConfig exchangeObjectAtIndex:i withObjectAtIndex:i - 1];
+    [self rebuildSettingsContent];
+}
+
+- (void)settingsMoveDown:(NSButton *)btn {
+    if (!_settingsEditConfig) return;
+    NSInteger i = btn.tag;
+    if (i < 0 || i >= (NSInteger)_settingsEditConfig.count - 1) return;
+    [_settingsEditConfig exchangeObjectAtIndex:i withObjectAtIndex:i + 1];
+    [self rebuildSettingsContent];
+}
+
+- (void)rebuildSettingsContent {
+    if (!_settingsContentView || !_settingsEditConfig) return;
+    NSView *cv = _settingsContentView;
+    NSUInteger n = _settingsEditConfig.count;
+    CGFloat rowH = 26;
+    CGFloat contentH = n * rowH;
+    cv.frame = NSMakeRect(0, 0, 290, contentH);
+
+    for (NSView *v in cv.subviews.copy) { [v removeFromSuperview]; }
+
+    for (NSUInteger i = 0; i < n; i++) {
+        NSDictionary *d = _settingsEditConfig[i];
+        CGFloat y = contentH - (i + 1) * rowH;
+
+        NSButton *cb = [[NSButton alloc] initWithFrame:NSMakeRect(4, y + 5, 16, 16)];
+        [cb setButtonType:NSButtonTypeSwitch]; cb.title = @"";
+        cb.state = [d[@"visible"] boolValue] ? NSControlStateValueOn : NSControlStateValueOff;
+        cb.tag = i; cb.target = self; cb.action = @selector(settingsCheckToggled:);
+        [cv addSubview:cb];
+
+        NSTextField *label = [[NSTextField alloc] initWithFrame:NSMakeRect(24, y + 3, 200, 20)];
+        label.stringValue = d[@"name"]; label.editable = NO; label.bordered = NO; label.drawsBackground = NO;
+        label.font = [NSFont systemFontOfSize:13];
+        [cv addSubview:label];
+
+        NSButton *up = [NSButton buttonWithTitle:@"▲" target:self action:@selector(settingsMoveUp:)];
+        up.frame = NSMakeRect(230, y + 3, 24, 18); up.bezelStyle = NSBezelStyleSmallSquare;
+        up.font = [NSFont systemFontOfSize:9]; up.tag = i; [cv addSubview:up];
+
+        NSButton *dn = [NSButton buttonWithTitle:@"▼" target:self action:@selector(settingsMoveDown:)];
+        dn.frame = NSMakeRect(256, y + 3, 24, 18); dn.bezelStyle = NSBezelStyleSmallSquare;
+        dn.font = [NSFont systemFontOfSize:9]; dn.tag = i; [cv addSubview:dn];
+    }
 }
 
 - (void)showFeatureAtIndex:(NSInteger)index {
