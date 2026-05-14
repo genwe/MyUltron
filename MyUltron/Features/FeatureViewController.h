@@ -28,4 +28,10 @@
 /// (e.g. DeviceScreenshot). Default is YES.
 + (BOOL)requiresApp;
 
+/// UDID of the currently selected device (simulator or real).
+@property (nonatomic, copy) NSString *deviceUDID;
+
+/// YES if the currently selected device is a simulator.
+@property (nonatomic, assign) BOOL isSimulator;
+
 @end

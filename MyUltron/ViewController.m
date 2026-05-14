@@ -760,9 +760,8 @@ static NSString * const kPrefFeatureConfig = @"MyUltronFeatureConfig";
     NSArray *classes = [self featureClasses];
     Class cls = classes[index];
     FeatureViewController *vc = [[cls alloc] init];
-    if ([vc respondsToSelector:@selector(setDeviceUDID:)]) {
-        [(id)vc setDeviceUDID:self.selectedUDID];
-    }
+    vc.deviceUDID = self.selectedUDID;
+    vc.isSimulator = self.selectedIsSimulator;
     [self addChildViewController:vc];
     vc.view.frame = self.containerView.bounds;
     vc.view.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;

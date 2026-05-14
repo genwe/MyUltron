@@ -22,14 +22,12 @@
 @property (nonatomic, assign) BOOL          running;
 @property (nonatomic, strong) dispatch_queue_t captureQueue;
 
-@property (nonatomic, copy)   NSString     *deviceUDID;
-
 @end
 
 @implementation LogMonitorViewController
 
 + (BOOL)requiresConnection { return YES; }
-+ (BOOL)requiresApp      { return YES; }
++ (BOOL)requiresApp      { return NO; }
 
 - (instancetype)init {
     return [super initWithFeatureName:@"日志监控"];
@@ -108,7 +106,7 @@
     _startStopBtn.title = @"■ 停止";
     _textView.string = @"正在连接设备…\n";
 
-    const char *udid = _deviceUDID.UTF8String ?: "";
+    const char *udid = self.deviceUDID.UTF8String ?: "";
     NSString *filter = _filterField.stringValue;
 
     self.captureQueue = dispatch_queue_create("com.myultron.syslog", DISPATCH_QUEUE_SERIAL);

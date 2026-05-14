@@ -136,14 +136,18 @@
 - (void)fetchAppList {
     [_rows removeAllObjects];
 
-    const char *udid = _deviceUDID.UTF8String;
-    if (!udid) {
-        NSLog(@"[AppList] No device UDID set");
+    NSString *udid = self.deviceUDID;
+    if (!udid) { NSLog(@"[AppList] No device UDID set"); return; }
+
+    if (self.isSimulator) {
+        [self fetchSimulatorAppList:udid];
         return;
     }
 
+    // Real device path: libimobiledevice
+    const char *cudid = udid.UTF8String;
     idevice_t device = NULL;
-    if (idevice_new_with_options(&device, udid, IDEVICE_LOOKUP_USBMUX) != IDEVICE_E_SUCCESS) {
+    if (idevice_new_with_options(&device, cudid, IDEVICE_LOOKUP_USBMUX) != IDEVICE_E_SUCCESS) {
         NSLog(@"[AppList] idevice_new failed");
         dispatch_async(dispatch_get_main_queue(), ^{
             _statusLabel.stringValue = @"无法连接设备";
@@ -231,6 +235,31 @@
 
     lockdownd_client_free(lockdown);
     idevice_free(device);
+}
+
+- (void)fetchSimulatorAppList:(NSString *)udid {
+    NSTask *task = [[NSTask alloc] init];
+    task.executableURL = [NSURL fileURLWithPath:@"/usr/bin/xcrun"];
+    task.arguments = @[@"simctl", @"listapps", udid];
+    NSPipe *pipe = [NSPipe pipe];
+    task.standardOutput = pipe;
+    task.standardError = [NSPipe pipe];
+    [task launch];
+    [task waitUntilExit];
+
+    NSData *data = [pipe.fileHandleForReading readDataToEndOfFile];
+    NSDictionary *plist = [NSPropertyListSerialization propertyListWithData:data options:0 format:nil error:nil];
+    if (![plist isKindOfClass:[NSDictionary class]]) return;
+
+    NSMutableArray<NSDictionary *> *apps = [NSMutableArray array];
+    [plist enumerateKeysAndObjectsUsingBlock:^(NSString *bid, NSDictionary *info, BOOL *stop) {
+        NSString *name = info[@"CFBundleDisplayName"] ?: info[@"CFBundleName"] ?: bid;
+        NSString *ver = info[@"CFBundleShortVersionString"] ?: info[@"CFBundleVersion"] ?: @"";
+        [apps addObject:@{@"name": name, @"bundleID": bid, @"version": ver}];
+    }];
+    [apps sortUsingDescriptors:@[[NSSortDescriptor sortDescriptorWithKey:@"name" ascending:YES
+                                                                 selector:@selector(localizedStandardCompare:)]]];
+    [_rows addObjectsFromArray:apps];
 }
 
 #pragma mark - NSTableViewDataSource

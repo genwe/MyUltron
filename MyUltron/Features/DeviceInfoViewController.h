@@ -9,8 +9,4 @@
 #import "FeatureViewController.h"
 
 @interface DeviceInfoViewController : FeatureViewController
-
-/// 由 ViewController 在创建后注入，已选中的设备 UDID。
-@property (nonatomic, copy) NSString *deviceUDID;
-
 @end

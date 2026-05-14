@@ -133,15 +133,20 @@
 - (void)fetchDeviceData {
     [_rows removeAllObjects];
 
-    const char *udid = _deviceUDID.UTF8String;
-    if (!udid) {
-        NSLog(@"[DeviceInfo] No device UDID set");
+    NSString *udid = self.deviceUDID;
+    if (!udid) { NSLog(@"[DeviceInfo] No device UDID set"); return; }
+
+    if (self.isSimulator) {
+        [self fetchSimulatorInfo:udid];
         return;
     }
-    NSLog(@"[DeviceInfo] Fetching info for UDID: %s", udid);
+
+    // Real device path: libimobiledevice
+    const char *cudid = udid.UTF8String;
+    NSLog(@"[DeviceInfo] Fetching info for real device: %s", cudid);
 
     idevice_t device = NULL;
-    idevice_error_t ret = idevice_new_with_options(&device, udid, IDEVICE_LOOKUP_USBMUX);
+    idevice_error_t ret = idevice_new_with_options(&device, cudid, IDEVICE_LOOKUP_USBMUX);
     if (ret != IDEVICE_E_SUCCESS) {
         NSLog(@"[DeviceInfo] idevice_new failed: %d", ret);
         dispatch_async(dispatch_get_main_queue(), ^{
@@ -179,7 +184,7 @@
     }
 
     // ---- 获取设备基本信息 (read from allValues dict directly) ----
-    [_rows addObject:@{@"label": @"设备号 (UDID)", @"value": _deviceUDID ?: @""}];
+    [_rows addObject:@{@"label": @"设备号 (UDID)", @"value": self.deviceUDID ?: @""}];
 
     [_rows addObject:@{
         @"label": @"设备名称",
@@ -221,6 +226,60 @@
 
     lockdownd_client_free(lockdown);
     idevice_free(device);
+}
+
+- (void)fetchSimulatorInfo:(NSString *)udid {
+    NSTask *task = [[NSTask alloc] init];
+    task.executableURL = [NSURL fileURLWithPath:@"/usr/bin/xcrun"];
+    task.arguments = @[@"simctl", @"list", @"devices", @"--json"];
+    NSPipe *pipe = [NSPipe pipe];
+    task.standardOutput = pipe;
+    task.standardError = [NSPipe pipe];
+    [task launch];
+    [task waitUntilExit];
+
+    NSData *data = [pipe.fileHandleForReading readDataToEndOfFile];
+    NSDictionary *json = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
+    NSDictionary *runtimes = json[@"devices"];
+    if (![runtimes isKindOfClass:[NSDictionary class]]) return;
+
+    NSDictionary *foundDevice = nil;
+    NSString *foundRuntime = nil;
+    for (NSString *runtimeKey in runtimes) {
+        if (![runtimeKey containsString:@"iOS"]) continue;
+        NSArray *devices = runtimes[runtimeKey];
+        if (![devices isKindOfClass:[NSArray class]]) continue;
+        for (NSDictionary *d in devices) {
+            if ([d[@"udid"] isEqualToString:udid]) {
+                foundDevice = d;
+                foundRuntime = runtimeKey;
+                break;
+            }
+        }
+        if (foundDevice) break;
+    }
+
+    if (!foundDevice) return;
+
+    [_rows addObject:@{@"label": @"设备号 (UDID)", @"value": udid}];
+    [_rows addObject:@{@"label": @"设备名称", @"value": foundDevice[@"name"] ?: @"—"}];
+    [_rows addObject:@{@"label": @"设备型号", @"value": foundDevice[@"deviceTypeIdentifier"] ?: @"—"}];
+
+    // Parse runtime: "com.apple.CoreSimulator.SimRuntime.iOS-18-0" → "iOS 18.0"
+    NSString *osVer = @"模拟器";
+    if (foundRuntime) {
+        NSArray *parts = [foundRuntime componentsSeparatedByString:@"."];
+        NSString *last = parts.lastObject;
+        if ([last containsString:@"-"]) {
+            osVer = [[last stringByReplacingOccurrencesOfString:@"-" withString:@" "] stringByReplacingOccurrencesOfString:@"iOS" withString:@"iOS "];
+        }
+    }
+    [_rows addObject:@{@"label": @"操作系统与版本", @"value": osVer}];
+
+    NSString *state = foundDevice[@"state"];
+    if (state) {
+        [_rows addObject:@{@"label": @"状态", @"value": state}];
+    }
 }
 
 /// Read a string value from a plist dict, returns nil if missing or wrong type.
