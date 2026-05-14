@@ -15,6 +15,7 @@
 
 @property (nonatomic, strong) NSTextView   *textView;
 @property (nonatomic, strong) NSTextField  *filterField;
+@property (nonatomic, strong) NSTextField  *keywordField;
 @property (nonatomic, strong) NSButton     *startStopBtn;
 @property (nonatomic, strong) NSButton     *clearBtn;
 @property (nonatomic, strong) NSButton     *autoScrollBtn;
@@ -27,7 +28,7 @@
 @implementation LogMonitorViewController
 
 + (BOOL)requiresConnection { return YES; }
-+ (BOOL)requiresApp      { return NO; }
++ (BOOL)requiresApp      { return YES; }
 
 - (instancetype)init {
     return [super initWithFeatureName:@"日志监控"];
@@ -47,30 +48,37 @@
 - (void)setupUI {
     CGFloat y = self.view.bounds.size.height - 12;
 
-    // Filter field
-    _filterField = [[NSTextField alloc] initWithFrame:NSMakeRect(8, y - 26, 160, 24)];
-    _filterField.placeholderString = @"过滤 (bundleID)…";
-    _filterField.font = [NSFont systemFontOfSize:12];
+    // Filter field (bundle ID)
+    _filterField = [[NSTextField alloc] initWithFrame:NSMakeRect(8, y - 26, 130, 24)];
+    _filterField.placeholderString = @"Bundle ID…";
+    _filterField.font = [NSFont systemFontOfSize:11];
     _filterField.autoresizingMask = NSViewMaxXMargin | NSViewMinYMargin;
     [self.view addSubview:_filterField];
 
+    // Keyword filter
+    _keywordField = [[NSTextField alloc] initWithFrame:NSMakeRect(142, y - 26, 100, 24)];
+    _keywordField.placeholderString = @"关键字…";
+    _keywordField.font = [NSFont systemFontOfSize:11];
+    _keywordField.autoresizingMask = NSViewMaxXMargin | NSViewMinYMargin;
+    [self.view addSubview:_keywordField];
+
     // Start/Stop button
     _startStopBtn = [NSButton buttonWithTitle:@"▶ 开始" target:self action:@selector(toggleCapture:)];
-    _startStopBtn.frame = NSMakeRect(174, y - 26, 80, 26);
+    _startStopBtn.frame = NSMakeRect(248, y - 26, 70, 26);
     _startStopBtn.bezelStyle = NSBezelStyleRounded;
     _startStopBtn.autoresizingMask = NSViewMaxXMargin | NSViewMinYMargin;
     [self.view addSubview:_startStopBtn];
 
     // Clear button
     _clearBtn = [NSButton buttonWithTitle:@"清空" target:self action:@selector(clearLog:)];
-    _clearBtn.frame = NSMakeRect(260, y - 26, 60, 26);
+    _clearBtn.frame = NSMakeRect(322, y - 26, 56, 26);
     _clearBtn.bezelStyle = NSBezelStyleRounded;
     _clearBtn.autoresizingMask = NSViewMaxXMargin | NSViewMinYMargin;
     [self.view addSubview:_clearBtn];
 
     // Auto scroll toggle
     _autoScrollBtn = [NSButton buttonWithTitle:@"自动滚屏" target:self action:@selector(toggleAutoScroll:)];
-    _autoScrollBtn.frame = NSMakeRect(326, y - 26, 90, 26);
+    _autoScrollBtn.frame = NSMakeRect(382, y - 26, 86, 26);
     [_autoScrollBtn setButtonType:NSButtonTypeSwitch];
     _autoScrollBtn.state = NSControlStateValueOn;
     _autoScrollBtn.autoresizingMask = NSViewMaxXMargin | NSViewMinYMargin;
@@ -102,6 +110,10 @@
 
 - (void)startCapture {
     if (_running) return;
+    if (self.deviceUDID.length == 0) {
+        [self appendLog:@"[错误] 请先选择设备"];
+        return;
+    }
     _running = YES;
     _startStopBtn.title = @"■ 停止";
     _textView.string = @"正在连接设备…\n";
@@ -116,8 +128,11 @@
         return;
     }
 
-    const char *udid = self.deviceUDID.UTF8String ?: "";
-    NSString *filter = _filterField.stringValue;
+    const char *udid = self.deviceUDID.UTF8String;
+    if (!udid || strlen(udid) == 0) {
+        dispatch_async(dispatch_get_main_queue(), ^{ [self appendLog:@"[错误] 无效的设备 UDID"]; [self stopCapture]; });
+        return;
+    }
 
     self.captureQueue = dispatch_queue_create("com.myultron.syslog", DISPATCH_QUEUE_SERIAL);
     dispatch_async(self.captureQueue, ^{
@@ -140,7 +155,17 @@
 
         dispatch_async(dispatch_get_main_queue(), ^{
             [self appendLog:@"[信息] 已连接，等待日志…"];
-            if (filter.length > 0) [self appendLog:[NSString stringWithFormat:@"[信息] 过滤器: %@", filter]];
+            NSString *bid = self->_filterField.stringValue;
+            NSString *kw  = self->_keywordField.stringValue;
+            if (bid.length > 0) [self appendLog:[NSString stringWithFormat:@"[信息] Bundle ID: %@", bid]];
+            if (kw.length > 0)  [self appendLog:[NSString stringWithFormat:@"[信息] 关键字: %@", kw]];
+        });
+
+        // Capture filter strings on main thread (thread-safe copies)
+        __block NSString *capturedBid = nil, *capturedKw = nil;
+        dispatch_sync(dispatch_get_main_queue(), ^{
+            capturedBid = self->_filterField.stringValue;
+            capturedKw  = self->_keywordField.stringValue;
         });
 
         // Read loop
@@ -159,7 +184,7 @@
             for (NSString *line in lines) {
                 NSString *trimmed = [line stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
                 if (trimmed.length == 0) continue;
-                if (filter.length > 0 && [trimmed rangeOfString:filter options:NSCaseInsensitiveSearch].location == NSNotFound) continue;
+                if (![self line:trimmed passesBidFilter:capturedBid kwFilter:capturedKw]) continue;
                 dispatch_async(dispatch_get_main_queue(), ^{ [self appendLog:trimmed]; });
             }
         }
@@ -176,12 +201,23 @@
 
 - (void)startSimulatorLogStream {
     NSString *udid = self.deviceUDID;
-    NSString *filter = _filterField.stringValue;
+    if (udid.length == 0) {
+        [self appendLog:@"[错误] 无效的模拟器 UDID"];
+        [self stopCapture];
+        return;
+    }
 
     dispatch_async(dispatch_get_main_queue(), ^{
         [self appendLog:[NSString stringWithFormat:@"[信息] 启动模拟器日志流 (UDID: %@)", udid]];
-        if (filter.length > 0) [self appendLog:[NSString stringWithFormat:@"[信息] 过滤器: %@", filter]];
+        NSString *bid = self->_filterField.stringValue;
+        NSString *kw  = self->_keywordField.stringValue;
+        if (bid.length > 0) [self appendLog:[NSString stringWithFormat:@"[信息] Bundle ID: %@", bid]];
+        if (kw.length > 0)  [self appendLog:[NSString stringWithFormat:@"[信息] 关键字: %@", kw]];
     });
+
+    // Already on main thread — read filter strings directly
+    NSString *capturedBid = _filterField.stringValue ?: @"";
+    NSString *capturedKw  = _keywordField.stringValue ?: @"";
 
     self.captureQueue = dispatch_queue_create("com.myultron.simlog", DISPATCH_QUEUE_SERIAL);
     dispatch_async(self.captureQueue, ^{
@@ -201,7 +237,7 @@
             for (NSString *line in [raw componentsSeparatedByString:@"\n"]) {
                 NSString *t = [line stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
                 if (t.length == 0) continue;
-                if (filter.length > 0 && [t rangeOfString:filter options:NSCaseInsensitiveSearch].location == NSNotFound) continue;
+                if (![self line:t passesBidFilter:capturedBid kwFilter:capturedKw]) continue;
                 dispatch_async(dispatch_get_main_queue(), ^{ [self appendLog:t]; });
             }
         };
@@ -258,11 +294,26 @@
 }
 - (void)toggleAutoScroll:(NSButton *)btn { _autoScroll = (btn.state == NSControlStateValueOn); }
 
+/// Thread-safe filter check — filter strings must be captured on main thread.
+- (BOOL)line:(NSString *)line passesBidFilter:(NSString *)bidFilter kwFilter:(NSString *)kwFilter {
+    if (bidFilter.length > 0 && [line rangeOfString:bidFilter options:NSCaseInsensitiveSearch].location == NSNotFound)
+        return NO;
+    if (kwFilter.length > 0 && [line rangeOfString:kwFilter options:NSCaseInsensitiveSearch].location == NSNotFound)
+        return NO;
+    return YES;
+}
+
 - (void)didReceiveMessage:(NSDictionary *)dict {
     if (!_running) return;
     if ([dict[@"messageType"] isEqualToString:@"log"]) {
         NSString *msg = dict[@"content"][@"message"];
-        if (msg) dispatch_async(dispatch_get_main_queue(), ^{ [self appendLog:msg]; });
+        if (msg) {
+            // TCP logs are from the connected app — skip bundle ID filter,
+            // only check keyword (user already chose the app)
+            NSString *kw = _keywordField.stringValue;
+            if (kw.length > 0 && [msg rangeOfString:kw options:NSCaseInsensitiveSearch].location == NSNotFound) return;
+            dispatch_async(dispatch_get_main_queue(), ^{ [self appendLog:msg]; });
+        }
     }
 }
 
