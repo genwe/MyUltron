@@ -31,6 +31,9 @@
 /// UDID of the currently selected device (simulator or real).
 @property (nonatomic, copy) NSString *deviceUDID;
 
+/// Bundle ID of the currently selected app (set by ViewController).
+@property (nonatomic, copy) NSString *appBundleID;
+
 /// YES if the currently selected device is a simulator.
 @property (nonatomic, assign) BOOL isSimulator;
 

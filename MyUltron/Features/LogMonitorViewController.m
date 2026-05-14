@@ -106,6 +106,16 @@
     _startStopBtn.title = @"■ 停止";
     _textView.string = @"正在连接设备…\n";
 
+    // Auto-set filter from selected app's bundle ID if not manually set
+    if (_filterField.stringValue.length == 0 && self.appBundleID.length > 0) {
+        _filterField.stringValue = self.appBundleID;
+    }
+
+    if (self.isSimulator) {
+        [self startSimulatorLogStream];
+        return;
+    }
+
     const char *udid = self.deviceUDID.UTF8String ?: "";
     NSString *filter = _filterField.stringValue;
 
@@ -164,7 +174,61 @@
     });
 }
 
+- (void)startSimulatorLogStream {
+    NSString *udid = self.deviceUDID;
+    NSString *filter = _filterField.stringValue;
+
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [self appendLog:[NSString stringWithFormat:@"[信息] 启动模拟器日志流 (UDID: %@)", udid]];
+        if (filter.length > 0) [self appendLog:[NSString stringWithFormat:@"[信息] 过滤器: %@", filter]];
+    });
+
+    self.captureQueue = dispatch_queue_create("com.myultron.simlog", DISPATCH_QUEUE_SERIAL);
+    dispatch_async(self.captureQueue, ^{
+        NSTask *task = [[NSTask alloc] init];
+        task.executableURL = [NSURL fileURLWithPath:@"/usr/bin/xcrun"];
+        task.arguments = @[@"simctl", @"spawn", udid, @"log", @"stream", @"--style", @"compact"];
+        NSPipe *pipe = [NSPipe pipe];
+        task.standardOutput = pipe;
+        task.standardError = pipe;
+
+        pipe.fileHandleForReading.readabilityHandler = ^(NSFileHandle *fh) {
+            NSData *data = [fh availableData];
+            if (data.length == 0 || !self->_running) return;
+            NSString *raw = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
+            if (!raw) return;
+
+            for (NSString *line in [raw componentsSeparatedByString:@"\n"]) {
+                NSString *t = [line stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+                if (t.length == 0) continue;
+                if (filter.length > 0 && [t rangeOfString:filter options:NSCaseInsensitiveSearch].location == NSNotFound) continue;
+                dispatch_async(dispatch_get_main_queue(), ^{ [self appendLog:t]; });
+            }
+        };
+
+        NSError *err = nil;
+        [task launchAndReturnError:&err];
+        if (err) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                [self appendLog:[NSString stringWithFormat:@"[错误] 启动失败: %@", err.localizedDescription]];
+                [self stopCapture];
+            });
+            return;
+        }
+        [task waitUntilExit];
+
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [self appendLog:@"[信息] 模拟器日志流已关闭"];
+            [self stopCapture];
+        });
+    });
+}
+
 - (void)stopCapture {
+    if (_captureQueue) {
+        // dispatch_suspend-like behavior for cleanup
+        _captureQueue = nil;
+    }
     _running = NO;
     _startStopBtn.title = @"▶ 开始";
     _captureQueue = nil;
@@ -194,8 +258,8 @@
 }
 - (void)toggleAutoScroll:(NSButton *)btn { _autoScroll = (btn.state == NSControlStateValueOn); }
 
-// Auto-receive TCP log messages when connected to app
 - (void)didReceiveMessage:(NSDictionary *)dict {
+    if (!_running) return;
     if ([dict[@"messageType"] isEqualToString:@"log"]) {
         NSString *msg = dict[@"content"][@"message"];
         if (msg) dispatch_async(dispatch_get_main_queue(), ^{ [self appendLog:msg]; });

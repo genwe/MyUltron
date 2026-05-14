@@ -97,6 +97,7 @@ static NSString * const kPrefFeatureConfig = @"MyUltronFeatureConfig";
 // Connection layer
 @property (nonatomic, strong, readwrite) MyUltronClient *client;
 @property (nonatomic, assign) uint16_t       serverPort;  // 62345
+@property (nonatomic, copy)   NSString       *selectedAppBundleID;
 @end
 
 @implementation ViewController
@@ -323,6 +324,7 @@ static NSString * const kPrefFeatureConfig = @"MyUltronFeatureConfig";
     self.selectedUDID = info[@"udid"];
     self.selectedIsSimulator = [info[@"simulator"] boolValue];
     self.appButton.title = @"请选择应用";
+    self.selectedAppBundleID = nil;
 }
 
 - (void)showAppMenu:(NSButton *)sender {
@@ -358,6 +360,9 @@ static NSString * const kPrefFeatureConfig = @"MyUltronFeatureConfig";
 
     // Keep track of the selected app info for connection
     NSString *bundleID = app[@"bundleID"];
+
+    // Store for injecting into features created later
+    self.selectedAppBundleID = bundleID;
 
     // Launch the app
     [self launchApp:bundleID onDevice:self.selectedUDID isSimulator:self.selectedIsSimulator];
@@ -762,6 +767,7 @@ static NSString * const kPrefFeatureConfig = @"MyUltronFeatureConfig";
     FeatureViewController *vc = [[cls alloc] init];
     vc.deviceUDID = self.selectedUDID;
     vc.isSimulator = self.selectedIsSimulator;
+    vc.appBundleID = self.selectedAppBundleID;
     [self addChildViewController:vc];
     vc.view.frame = self.containerView.bounds;
     vc.view.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
