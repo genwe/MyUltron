@@ -171,9 +171,9 @@ static NSString * const kPrefFeatureConfig = @"MyUltronFeatureConfig";
     self.containerView = [[NSView alloc] initWithFrame:containerFrame];
     self.containerView.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable | NSViewMinYMargin;
     self.containerView.wantsLayer = YES;
-    self.containerView.layer.backgroundColor = [[NSColor colorWithWhite:0.96 alpha:1.0] CGColor];
+    self.containerView.layer.backgroundColor = [[NSColor controlBackgroundColor] CGColor];
     self.containerView.layer.borderWidth = 1;
-    self.containerView.layer.borderColor = [[NSColor lightGrayColor] CGColor];
+    self.containerView.layer.borderColor = [[NSColor separatorColor] CGColor];
     [self.view addSubview:self.containerView];
 
     // Register drag-and-drop for .app / .ipa files
@@ -985,17 +985,6 @@ static NSString * const kPrefFeatureConfig = @"MyUltronFeatureConfig";
     }
     return NO;
 }
-
-- (void)setDragHighlight:(BOOL)highlight {
-    if (highlight) {
-        self.containerView.layer.borderWidth = 3;
-        self.containerView.layer.borderColor = [[NSColor systemBlueColor] CGColor];
-    } else {
-        self.containerView.layer.borderWidth = 1;
-        self.containerView.layer.borderColor = [[NSColor lightGrayColor] CGColor];
-    }
-}
-
 - (NSDragOperation)draggingEntered:(id<NSDraggingInfo>)sender {
     NSPasteboard *pboard = [sender draggingPasteboard];
     NSArray<NSURL *> *urls = [pboard readObjectsForClasses:@[[NSURL class]]
@@ -1287,6 +1276,16 @@ static NSString * const kPrefFeatureConfig = @"MyUltronFeatureConfig";
 #pragma mark - instproxy Install Helper
 
 typedef struct { BOOL done; NSString * __strong errMsg; } InstallCtx;
+
+- (void)setDragHighlight:(BOOL)highlight {
+    if (highlight) {
+        self.containerView.layer.borderWidth = 3;
+        self.containerView.layer.borderColor = [[NSColor systemBlueColor] CGColor];
+    } else {
+        self.containerView.layer.borderWidth = 1;
+        self.containerView.layer.borderColor = [[NSColor separatorColor] CGColor];
+    }
+}
 
 static void instproxy_status_callback(plist_t command, plist_t status, void *user_data) {
     if (!status) return;
