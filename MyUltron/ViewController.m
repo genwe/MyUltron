@@ -98,6 +98,17 @@ static NSString * const kPrefFeatureConfig = @"MyUltronFeatureConfig";
 @property (nonatomic, strong, readwrite) MyUltronClient *client;
 @property (nonatomic, assign) uint16_t       serverPort;  // 62345
 @property (nonatomic, copy)   NSString       *selectedAppBundleID;
+
+// Private helper methods (defined later but called from dispatch blocks above)
+- (NSArray<NSDictionary *> *)bootedSimulators;
+- (NSArray<NSDictionary *> *)bootedSimulatorsFromFileSystem;
+- (NSString *)deviceNameForUDID:(const char *)udid;
+- (NSArray<NSDictionary *> *)appsForSimulator:(NSString *)udid;
+- (NSArray<NSDictionary *> *)appsForDevice:(NSString *)udid;
+- (void)launchApp:(NSString *)bundleID onDevice:(NSString *)udid isSimulator:(BOOL)isSimulator;
+- (void)connectToDeviceServer;
+- (void)showFeatureAtIndex:(NSInteger)index;
+- (void)showToast:(NSString *)message;
 @end
 
 @implementation ViewController
@@ -284,38 +295,96 @@ static NSString * const kPrefFeatureConfig = @"MyUltronFeatureConfig";
 }
 
 - (void)showDeviceMenu:(NSButton *)sender {
-    NSMenu *menu = [[NSMenu alloc] init];
+    // 防止重入
+    if (!self.deviceButton.enabled) return;
 
-    // 模拟器
-    NSArray<NSDictionary *> *sims = [self bootedSimulators];
-    for (NSDictionary *sim in sims) {
-        NSMenuItem *item = [[NSMenuItem alloc] initWithTitle:sim[@"name"] action:@selector(selectDevice:) keyEquivalent:@""];
-        item.target = self;
-        item.representedObject = sim;
-        [menu addItem:item];
-    }
+    NSString *origTitle = self.deviceButton.title;
+    self.deviceButton.title = @"扫描中…";
+    self.deviceButton.enabled = NO;
 
-    // 真机
-    char **udids = NULL;
-    int count = 0;
-    if (idevice_get_device_list(&udids, &count) == IDEVICE_E_SUCCESS && count > 0) {
-        if (sims.count > 0) [menu addItem:[NSMenuItem separatorItem]];
-        for (int i = 0; i < count; i++) {
-            NSString *udid = @(udids[i]);
-            NSString *name = [self deviceNameForUDID:udids[i]] ?: udid;
-            NSMenuItem *item = [[NSMenuItem alloc] initWithTitle:name action:@selector(selectDevice:) keyEquivalent:@""];
-            item.target = self;
-            item.representedObject = @{@"name": name, @"udid": udid, @"simulator": @NO};
-            [menu addItem:item];
-        }
-        idevice_device_list_free(udids);
-    }
+    NSLog(@"[MyUltron] Device scan started…");
 
-    if (menu.numberOfItems == 0) {
-        [menu addItemWithTitle:@"未检测到设备" action:nil keyEquivalent:@""];
-    }
+    // 超时保护：8 秒
+    __block BOOL menuShown = NO;
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(8.0 * NSEC_PER_SEC)),
+                   dispatch_get_main_queue(), ^{
+        if (menuShown) return;
+        menuShown = YES;
+        self.deviceButton.title = origTitle;
+        self.deviceButton.enabled = YES;
+        NSLog(@"[MyUltron] Device scan TIMEOUT — showing fallback menu");
+        NSMenu *menu = [[NSMenu alloc] init];
+        [menu addItemWithTitle:@"设备扫描超时，请重试" action:nil keyEquivalent:@""];
+        [menu popUpMenuPositioningItem:nil atLocation:NSMakePoint(0, sender.bounds.size.height) inView:sender];
+    });
 
-    [menu popUpMenuPositioningItem:nil atLocation:NSMakePoint(0, sender.bounds.size.height) inView:sender];
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        // 模拟器和真机并行扫描
+        __block NSArray<NSDictionary *> *sims = nil;
+        __block NSMutableArray<NSDictionary *> *realDevices = [NSMutableArray array];
+
+        dispatch_group_t group = dispatch_group_create();
+
+        dispatch_group_async(group, dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+            NSLog(@"[MyUltron] Scanning simulators…");
+            sims = [self bootedSimulators];
+            NSLog(@"[MyUltron] Found %lu booted simulator(s)", (unsigned long)sims.count);
+        });
+
+        dispatch_group_async(group, dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+            NSLog(@"[MyUltron] Scanning real devices…");
+            char **udids = NULL;
+            int count = 0;
+            if (idevice_get_device_list(&udids, &count) == IDEVICE_E_SUCCESS && count > 0) {
+                NSLog(@"[MyUltron] Found %d real device(s), fetching names…", count);
+                for (int i = 0; i < count; i++) {
+                    NSString *udid = @(udids[i]);
+                    NSLog(@"[MyUltron]   → fetching name for %@…", udid);
+                    NSString *name = [self deviceNameForUDID:udids[i]] ?: udid;
+                    NSLog(@"[MyUltron]   → %@ = %@", udid, name);
+                    [realDevices addObject:@{@"name": name, @"udid": udid, @"simulator": @NO}];
+                }
+                idevice_device_list_free(udids);
+            } else {
+                NSLog(@"[MyUltron] No real devices found");
+            }
+        });
+
+        dispatch_group_wait(group, DISPATCH_TIME_FOREVER);
+
+        // 回到主线程构建菜单
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (menuShown) return;  // 超时已弹出，丢弃过期结果
+            menuShown = YES;
+            self.deviceButton.title = origTitle;
+            self.deviceButton.enabled = YES;
+
+            NSMenu *menu = [[NSMenu alloc] init];
+
+            for (NSDictionary *sim in sims) {
+                NSMenuItem *item = [[NSMenuItem alloc] initWithTitle:sim[@"name"] action:@selector(selectDevice:) keyEquivalent:@""];
+                item.target = self;
+                item.representedObject = sim;
+                [menu addItem:item];
+            }
+
+            if (realDevices.count > 0) {
+                if (sims.count > 0) [menu addItem:[NSMenuItem separatorItem]];
+                for (NSDictionary *dev in realDevices) {
+                    NSMenuItem *item = [[NSMenuItem alloc] initWithTitle:dev[@"name"] action:@selector(selectDevice:) keyEquivalent:@""];
+                    item.target = self;
+                    item.representedObject = dev;
+                    [menu addItem:item];
+                }
+            }
+
+            if (menu.numberOfItems == 0) {
+                [menu addItemWithTitle:@"未检测到设备" action:nil keyEquivalent:@""];
+            }
+
+            [menu popUpMenuPositioningItem:nil atLocation:NSMakePoint(0, sender.bounds.size.height) inView:sender];
+        });
+    });
 }
 
 - (void)selectDevice:(NSMenuItem *)item {
@@ -335,23 +404,56 @@ static NSString * const kPrefFeatureConfig = @"MyUltronFeatureConfig";
         return;
     }
 
-    NSMenu *menu = [[NSMenu alloc] init];
-    NSArray<NSDictionary *> *apps = self.selectedIsSimulator
-        ? [self appsForSimulator:self.selectedUDID]
-        : [self appsForDevice:self.selectedUDID];
+    // 防止重入
+    if (!self.appButton.enabled) return;
 
-    for (NSDictionary *app in apps) {
-        NSMenuItem *item = [[NSMenuItem alloc] initWithTitle:app[@"name"] action:@selector(selectApp:) keyEquivalent:@""];
-        item.target = self;
-        item.representedObject = app;
-        [menu addItem:item];
-    }
+    NSString *origTitle = self.appButton.title;
+    self.appButton.title = @"加载中…";
+    self.appButton.enabled = NO;
 
-    if (menu.numberOfItems == 0) {
-        [menu addItemWithTitle:@"未找到App" action:nil keyEquivalent:@""];
-    }
+    NSLog(@"[MyUltron] App scan started for %@…", self.selectedIsSimulator ? @"simulator" : @"device");
 
-    [menu popUpMenuPositioningItem:nil atLocation:NSMakePoint(0, sender.bounds.size.height) inView:sender];
+    // 超时保护：15 秒（真机 app 枚举需要 lockdown + instproxy_browse，比设备枚举更慢）
+    __block BOOL menuShown = NO;
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(15.0 * NSEC_PER_SEC)),
+                   dispatch_get_main_queue(), ^{
+        if (menuShown) return;
+        menuShown = YES;
+        self.appButton.title = origTitle;
+        self.appButton.enabled = YES;
+        NSLog(@"[MyUltron] App scan TIMEOUT");
+        NSMenu *menu = [[NSMenu alloc] init];
+        [menu addItemWithTitle:@"应用扫描超时，请重试" action:nil keyEquivalent:@""];
+        [menu popUpMenuPositioningItem:nil atLocation:NSMakePoint(0, sender.bounds.size.height) inView:sender];
+    });
+
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSArray<NSDictionary *> *apps = self.selectedIsSimulator
+            ? [self appsForSimulator:self.selectedUDID]
+            : [self appsForDevice:self.selectedUDID];
+        NSLog(@"[MyUltron] Found %lu app(s)", (unsigned long)apps.count);
+
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (menuShown) return;
+            menuShown = YES;
+            self.appButton.title = origTitle;
+            self.appButton.enabled = YES;
+
+            NSMenu *menu = [[NSMenu alloc] init];
+            for (NSDictionary *app in apps) {
+                NSMenuItem *item = [[NSMenuItem alloc] initWithTitle:app[@"name"] action:@selector(selectApp:) keyEquivalent:@""];
+                item.target = self;
+                item.representedObject = app;
+                [menu addItem:item];
+            }
+
+            if (menu.numberOfItems == 0) {
+                [menu addItemWithTitle:@"未找到App" action:nil keyEquivalent:@""];
+            }
+
+            [menu popUpMenuPositioningItem:nil atLocation:NSMakePoint(0, sender.bounds.size.height) inView:sender];
+        });
+    });
 }
 
 - (void)selectApp:(NSMenuItem *)item {
@@ -376,34 +478,55 @@ static NSString * const kPrefFeatureConfig = @"MyUltronFeatureConfig";
 
 #pragma mark - Device helpers
 
-- (NSArray<NSDictionary *> *)bootedSimulators {
-    NSTask *task = [[NSTask alloc] init];
-    task.executableURL = [NSURL fileURLWithPath:@"/usr/bin/xcrun"];
-    task.arguments = @[@"simctl", @"list", @"devices", @"--json"];
-    NSPipe *pipe = [NSPipe pipe];
-    task.standardOutput = pipe;
-    task.standardError = [NSPipe pipe];
-    if (![task launchAndReturnError:nil]) return @[];
-    [task waitUntilExit];
+/// 直接定位 simctl 路径（绕过 xcrun，在新 macOS 上 xcrun 的 XPC 初始化可能阻塞）
++ (nullable NSString *)simctlPath {
+    // 每次检查（不缓存），确保更新代码后立即生效
+    NSArray *candidates = @[
+        @"/Applications/Xcode.app/Contents/Developer/usr/bin/simctl",
+        @"/Applications/Xcode-beta.app/Contents/Developer/usr/bin/simctl",
+        @"/Library/Developer/CommandLineTools/usr/bin/simctl",
+    ];
+    NSFileManager *fm = [NSFileManager defaultManager];
+    for (NSString *path in candidates) {
+        if ([fm isExecutableFileAtPath:path]) {
+            NSLog(@"[MyUltron] simctlPath: found at %@", path);
+            return path;
+        }
+    }
+    NSLog(@"[MyUltron] simctlPath: not found at known paths, will fall back to xcrun");
+    return nil;
+}
 
-    NSData *data = [pipe.fileHandleForReading readDataToEndOfFile];
-    NSDictionary *json = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
-    NSDictionary *devicesByRuntime = json[@"devices"];
-    if (![devicesByRuntime isKindOfClass:[NSDictionary class]]) return @[];
+/// simctl 超时后的回退方案：直接读取 CoreSimulator 文件系统中的 device.plist
+/// 不依赖任何 XPC 服务，纯文件 I/O
+- (NSArray<NSDictionary *> *)bootedSimulatorsFromFileSystem {
+    NSString *devicesRoot = [@"~/Library/Developer/CoreSimulator/Devices" stringByExpandingTildeInPath];
+    NSFileManager *fm = [NSFileManager defaultManager];
+    NSArray<NSString *> *entries = [fm contentsOfDirectoryAtPath:devicesRoot error:nil];
+    if (!entries) return @[];
 
     NSMutableArray *result = [NSMutableArray array];
-    [devicesByRuntime enumerateKeysAndObjectsUsingBlock:^(NSString *runtime, NSArray *devices, BOOL *stop) {
-        if (![runtime containsString:@"iOS"]) return;
-        for (NSDictionary *d in devices) {
-            if (![d[@"state"] isEqualToString:@"Booted"]) continue;
-            NSString *name = d[@"name"];
-            NSString *udid = d[@"udid"];
-            if (name && udid) {
-                [result addObject:@{@"name": name, @"udid": udid, @"simulator": @YES}];
-            }
+    for (NSString *entry in entries) {
+        // 跳过非 UUID 目录名（如 .DS_Store, device_set.plist）
+        if (entry.length != 36 || [entry characterAtIndex:8] != '-') continue;
+
+        NSString *plistPath = [devicesRoot stringByAppendingPathComponent:[entry stringByAppendingPathComponent:@"device.plist"]];
+        NSDictionary *plist = [NSDictionary dictionaryWithContentsOfFile:plistPath];
+        if (!plist) continue;
+
+        // CoreSimulator device.plist state: 0=Creating, 1=Shutdown, 3=Booted
+        if ([plist[@"state"] integerValue] == 3) {
+            NSString *name = plist[@"name"] ?: entry;
+            [result addObject:@{@"name": name, @"udid": entry, @"simulator": @YES}];
         }
-    }];
+    }
+    NSLog(@"[MyUltron] bootedSimulatorsFromFileSystem: found %lu booted", (unsigned long)result.count);
     return result;
+}
+
+- (NSArray<NSDictionary *> *)bootedSimulators {
+    // simctl/xcrun 在新 macOS 上因 XPC 问题阻塞 5s+，直接走文件系统扫描
+    return [self bootedSimulatorsFromFileSystem];
 }
 
 - (NSString *)deviceNameForUDID:(const char *)udid {
@@ -428,14 +551,42 @@ static NSString * const kPrefFeatureConfig = @"MyUltronFeatureConfig";
 #pragma mark - App helpers
 
 - (NSArray<NSDictionary *> *)appsForSimulator:(NSString *)udid {
+    NSString *simctl = [ViewController simctlPath];
+    if (!simctl) simctl = @"/usr/bin/xcrun simctl";
+
     NSTask *task = [[NSTask alloc] init];
-    task.executableURL = [NSURL fileURLWithPath:@"/usr/bin/xcrun"];
-    task.arguments = @[@"simctl", @"listapps", udid];
+    if ([simctl hasSuffix:@"simctl"]) {
+        task.executableURL = [NSURL fileURLWithPath:simctl];
+        task.arguments = @[@"listapps", udid];
+        // 直接调用 simctl 需要设置 DEVELOPER_DIR
+        task.environment = @{@"DEVELOPER_DIR": [simctl stringByDeletingLastPathComponent].stringByDeletingLastPathComponent.stringByDeletingLastPathComponent};
+    } else {
+        task.executableURL = [NSURL fileURLWithPath:@"/usr/bin/xcrun"];
+        task.arguments = @[@"simctl", @"listapps", udid];
+    }
     NSPipe *pipe = [NSPipe pipe];
     task.standardOutput = pipe;
     task.standardError = [NSPipe pipe];
-    if (![task launchAndReturnError:nil]) return @[];
+    if (![task launchAndReturnError:nil]) {
+        NSLog(@"[MyUltron] appsForSimulator: failed to launch xcrun");
+        return @[];
+    }
+
+    // 与 bootedSimulators 同样的超时保护
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(5.0 * NSEC_PER_SEC)),
+                   dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        if (task.isRunning) {
+            NSLog(@"[MyUltron] appsForSimulator: xcrun timed out, terminating");
+            [task terminate];
+        }
+    });
+
     [task waitUntilExit];
+
+    if (task.terminationReason == NSTaskTerminationReasonUncaughtSignal) {
+        NSLog(@"[MyUltron] appsForSimulator: xcrun killed by timeout");
+        return @[];
+    }
 
     NSData *data = [pipe.fileHandleForReading readDataToEndOfFile];
     NSDictionary *plistDict = [NSPropertyListSerialization propertyListWithData:data options:0 format:nil error:nil];
@@ -532,7 +683,6 @@ static NSString * const kPrefFeatureConfig = @"MyUltronFeatureConfig";
 - (void)connectToDeviceServer {
     [self.client disconnect];
 
-    // Always read the latest port from Preferences
     self.serverPort = [AppDelegate serverPort];
 
     if (self.selectedIsSimulator) {

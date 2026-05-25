@@ -86,66 +86,73 @@ static NSString * const kMsgKeyContent = @"content";
 - (void)connectToDeviceUDID:(NSString *)udid port:(uint16_t)port {
     [self disconnect];
 
-    // 1. Open device handle via usbmuxd
-    idevice_t device = NULL;
-    idevice_error_t ret = idevice_new_with_options(&device, udid.UTF8String, IDEVICE_LOOKUP_USBMUX);
-    if (ret != IDEVICE_E_SUCCESS) {
-        NSLog(@"[MyUltron] Failed to open device %@: idevice error %d", udid, ret);
-        return;
-    }
+    NSString *udidCopy = [udid copy];
+    uint16_t portCopy = port;
 
-    // 2. Connect to the TCP port on the device
-    idevice_connection_t conn = NULL;
-    ret = idevice_connect(device, port, &conn);
-    idevice_free(device);
-    device = NULL;
+    // 将阻塞的 libimobiledevice 调用放到后台线程
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        // 1. Open device handle via usbmuxd
+        idevice_t device = NULL;
+        idevice_error_t ret = idevice_new_with_options(&device, udidCopy.UTF8String, IDEVICE_LOOKUP_USBMUX);
+        if (ret != IDEVICE_E_SUCCESS) {
+            NSLog(@"[MyUltron] Failed to open device %@: idevice error %d", udidCopy, ret);
+            return;
+        }
 
-    if (ret != IDEVICE_E_SUCCESS) {
-        NSLog(@"[MyUltron] Failed to connect to device %@:%u — idevice error %d", udid, port, ret);
-        return;
-    }
+        // 2. Connect to the TCP port on the device
+        idevice_connection_t conn = NULL;
+        ret = idevice_connect(device, portCopy, &conn);
+        idevice_free(device);
 
-    // 3. Get the native socket fd from the connection
-    int sock = -1;
-    ret = idevice_connection_get_fd(conn, &sock);
-    if (ret != IDEVICE_E_SUCCESS || sock < 0) {
-        NSLog(@"[MyUltron] Failed to get socket fd from device connection");
-        idevice_disconnect(conn);
-        return;
-    }
+        if (ret != IDEVICE_E_SUCCESS) {
+            NSLog(@"[MyUltron] Failed to connect to device %@:%u — idevice error %d", udidCopy, portCopy, ret);
+            return;
+        }
 
-    self.deviceConnection = conn;
+        // 3. Get the native socket fd from the connection
+        int sock = -1;
+        ret = idevice_connection_get_fd(conn, &sock);
+        if (ret != IDEVICE_E_SUCCESS || sock < 0) {
+            NSLog(@"[MyUltron] Failed to get socket fd from device connection");
+            idevice_disconnect(conn);
+            return;
+        }
 
-    // 4. Wrap the native socket in CFStreams (same NSStream path as connectToHost:)
-    CFReadStreamRef  read  = NULL;
-    CFWriteStreamRef write = NULL;
-    CFStreamCreatePairWithSocket(kCFAllocatorDefault, sock, &read, &write);
+        // 回到主线程设置 CFStream（必须在主线程调度到 main run loop）
+        dispatch_async(dispatch_get_main_queue(), ^{
+            self.deviceConnection = conn;
 
-    if (!read || !write) {
-        NSLog(@"[MyUltron] Failed to create streams from device socket");
-        idevice_disconnect(conn);
-        self.deviceConnection = NULL;
-        return;
-    }
+            CFReadStreamRef  read  = NULL;
+            CFWriteStreamRef write = NULL;
+            CFStreamCreatePairWithSocket(kCFAllocatorDefault, sock, &read, &write);
 
-    self.inputStream  = CFBridgingRelease(read);
-    self.outputStream = CFBridgingRelease(write);
+            if (!read || !write) {
+                NSLog(@"[MyUltron] Failed to create streams from device socket");
+                idevice_disconnect(conn);
+                self.deviceConnection = NULL;
+                return;
+            }
 
-    self.inputStream.delegate  = self;
-    self.outputStream.delegate = self;
+            self.inputStream  = CFBridgingRelease(read);
+            self.outputStream = CFBridgingRelease(write);
 
-    CFReadStreamSetProperty(read, kCFStreamPropertyShouldCloseNativeSocket, kCFBooleanTrue);
-    CFWriteStreamSetProperty(write, kCFStreamPropertyShouldCloseNativeSocket, kCFBooleanTrue);
+            self.inputStream.delegate  = self;
+            self.outputStream.delegate = self;
 
-    [self.inputStream  scheduleInRunLoop:[NSRunLoop mainRunLoop]
-                                 forMode:NSDefaultRunLoopMode];
-    [self.outputStream scheduleInRunLoop:[NSRunLoop mainRunLoop]
-                                 forMode:NSDefaultRunLoopMode];
+            CFReadStreamSetProperty(read, kCFStreamPropertyShouldCloseNativeSocket, kCFBooleanTrue);
+            CFWriteStreamSetProperty(write, kCFStreamPropertyShouldCloseNativeSocket, kCFBooleanTrue);
 
-    [self.inputStream  open];
-    [self.outputStream open];
+            [self.inputStream  scheduleInRunLoop:[NSRunLoop mainRunLoop]
+                                         forMode:NSDefaultRunLoopMode];
+            [self.outputStream scheduleInRunLoop:[NSRunLoop mainRunLoop]
+                                         forMode:NSDefaultRunLoopMode];
 
-    NSLog(@"[MyUltron] Connecting to device %@:%u via usbmuxd ...", udid, port);
+            [self.inputStream  open];
+            [self.outputStream open];
+
+            NSLog(@"[MyUltron] Connecting to device %@:%u via usbmuxd ...", udidCopy, portCopy);
+        });
+    });
 }
 
 - (void)disconnect {
