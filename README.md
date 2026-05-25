@@ -2,6 +2,8 @@
 
 [English](./README.md) | [中文](./README-zh.md) 
 
+![MyUltron Screenshot](MyUltron_screen_shot_1.png)
+
 iOS debugging desktop client. Connects to the MyUltronServer embedded in an iOS app via USB or simulator, providing device info, sandbox management, log monitoring, database browsing, and more.
 
 ## Device Connection

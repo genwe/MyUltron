@@ -2,6 +2,8 @@
 
 [English](./README.md) | [中文](./README-zh.md) 
 
+![MyUltron 截图](MyUltron_screen_shot_1.png)
+
 iOS 调试工具桌面客户端。通过 USB 或模拟器连接到 iOS 应用中嵌入的 MyUltronServer，提供设备信息、沙盒管理、日志监控、数据库浏览等调试功能。
 
 ## 设备连接
