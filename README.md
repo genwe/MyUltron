@@ -1,44 +1,44 @@
 # MyUltron
 
-iOS 调试工具桌面客户端。通过 USB 或模拟器连接到 iOS 应用中嵌入的 MyUltronServer，提供设备信息、沙盒管理、日志监控、数据库浏览等调试功能。
+iOS debugging desktop client. Connects to the MyUltronServer embedded in an iOS app via USB or simulator, providing device info, sandbox management, log monitoring, database browsing, and more.
 
-## 设备连接
+## Device Connection
 
-- **真机** — USB 连接，通过 libimobiledevice + usbmuxd 端口转发
-- **模拟器** — localhost TCP 连接，端口可通过 Preferences 配置（默认 62345）
-- 自动发现已启动的模拟器和 USB 连接的真机
-- 支持拖拽 `.app` / `.ipa` 安装到已连接设备
+- **Real Device** — USB connection via libimobiledevice + usbmuxd port forwarding
+- **Simulator** — localhost TCP connection, port configurable in Preferences (default 62345)
+- Auto-discovery of booted simulators and USB-connected real devices
+- Drag-and-drop `.app` / `.ipa` installation to connected devices
 
-## 功能列表
+## Features
 
-| 功能 | 说明 | 状态 |
+| Feature | Description | Status |
 |---|---|---|
-| 设备信息 | 显示设备基本信息（设备名、系统版本、UDID 等） | ✅ |
-| 应用列表 | 已安装用户应用列表（名称、Bundle ID、版本） | ✅ |
-| 设备截屏 | 实时获取 iOS 设备屏幕截图 | ✅ |
-| 沙盒管理 | 浏览、创建、删除、上传、下载沙盒文件 | ✅ |
-| MMKV数据 | 浏览和管理 MMKV 键值存储数据 | 🚧 |
-| UserDefault数据 | 浏览和管理 NSUserDefaults 数据 | ✅ |
-| SQLite浏览器 | 选择数据库、浏览表数据、增删改查 | ✅ |
-| 编解码 | Base64 / URL encode-decode 等常用编码工具 | ✅ |
-| 消息推送 | 向已连接应用发送自定义推送消息 | 🚧 |
-| 网络监控 | 实时监控应用网络请求 | 🚧 |
-| 日志监控 | 实时查看应用控制台日志 | ✅ |
-| 埋点监控 | 监控应用埋点事件 | 🚧 |
-| IM会话监控 | 监控 IM 会话消息 | 🚧 |
-| 路由校验 | 验证应用路由配置 | 🚧 |
-| 环境切换 | 切换应用运行环境（开发/测试/生产） | 🚧 |
-| 崩溃日志 | 查看和导出应用崩溃日志 | 🚧 |
-| 热修复 | 管理应用热修复补丁 | 🚧 |
-| 灰度任务 | 管理灰度发布任务 | 🚧 |
-| 解析日志文件 | 解析 xlog/mars 加密日志文件 | 🚧 |
+| Device Info | Display basic device info (name, OS version, UDID, etc.) | ✅ |
+| App List | List installed user apps (name, Bundle ID, version) | ✅ |
+| Screenshot | Real-time iOS device screenshot capture | ✅ |
+| Sandbox | Browse, create, delete, upload, download sandbox files | ✅ |
+| MMKV Data | Browse and manage MMKV key-value data | 🚧 |
+| UserDefaults | Browse and manage NSUserDefaults data | ✅ |
+| SQLite Browser | Select databases, browse table data, CRUD operations | ✅ |
+| Codec | Base64 / URL encode-decode and other encoding tools | ✅ |
+| Push Notifications | Send custom push messages to connected app | 🚧 |
+| Network Monitor | Real-time network request monitoring | 🚧 |
+| Log Monitor | Real-time console log viewing | ✅ |
+| Analytics Monitor | Monitor analytics tracking events | 🚧 |
+| IM Session Monitor | Monitor IM session messages | 🚧 |
+| Route Validation | Validate app routing configuration | 🚧 |
+| Environment Switch | Switch app runtime environment (dev/test/prod) | 🚧 |
+| Crash Logs | View and export app crash logs | 🚧 |
+| Hotfix | Manage app hotfix patches | 🚧 |
+| Grayscale Tasks | Manage grayscale release tasks | 🚧 |
+| Log Parser | Parse xlog/mars encrypted log files | 🚧 |
 
-## 侧边栏自定义
+## Sidebar Customization
 
-功能模块可显示/隐藏、拖拽调整顺序，设置通过 NSUserDefaults 持久化。
+Feature modules can be shown/hidden and reordered via drag-and-drop. Settings are persisted in NSUserDefaults.
 
-## 系统要求
+## Requirements
 
 - macOS 13+
 - Xcode 14+
-- libimobiledevice（用于真机通信）
+- libimobiledevice (for real device communication)
