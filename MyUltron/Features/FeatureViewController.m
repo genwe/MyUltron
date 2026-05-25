@@ -44,4 +44,9 @@
     ]];
 }
 
+- (void)viewDidConnect    {}
+- (void)viewDidDisconnect {}
+- (void)didReceiveMessage:(NSDictionary *)dict {}
+- (void)didReceiveBinaryData:(NSData *)data {}
+
 @end

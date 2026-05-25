@@ -2,20 +2,17 @@
 //  DeviceScreenshotViewController.m
 //  MyUltron
 //
-//  使用 libimobiledevice 直接从 iOS 设备获取截屏。
-//  通过 USB/WiFi 连接设备 → lockdown 配对 → screenshotr 服务 → 截取屏幕。
-//
-//  编译要求：在 Xcode Build Settings → Header Search Paths 中添加
-//    $(SRCROOT)/ios_lib_arm64/include
-//  并在 Link Binary With Libraries 中添加：
-//    libimobiledevice.a  libimobiledevice-glue.a  libplist.a
-//    libusbmuxd.a        libssl.a                  libcrypto.a
+//  通过 MyUltronServer TCP 通道截取 iOS app 画面。
+//  Mac → 发送 screenshot 请求 → iOS 端截屏 → PNG 二进制回传 → 显示。
 //
 
 #import "DeviceScreenshotViewController.h"
-#include <libimobiledevice/libimobiledevice.h>
-#include <libimobiledevice/lockdown.h>
-#include <libimobiledevice/screenshotr.h>
+#import "../ViewController.h"
+#import "../Core/MyUltronClient.h"
+
+static NSString * const kMsgVersion = @"version";
+static NSString * const kMsgType    = @"messageType";
+static NSString * const kMsgContent = @"content";
 
 @interface DeviceScreenshotViewController ()
 
@@ -26,7 +23,7 @@
 @property (nonatomic, strong) NSProgressIndicator *spinner;
 
 @property (nonatomic, strong) NSImage           *currentScreenshot;
-@property (nonatomic, copy)   NSString          *deviceUDID;
+@property (nonatomic, strong) NSLayoutConstraint *imageHeightConstraint;
 
 @end
 
@@ -34,23 +31,48 @@
 
 #pragma mark - Init
 
-+ (BOOL)requiresApp { return NO; }
++ (BOOL)requiresApp { return YES; }   // 需要 TCP 连接到运行中的 iOS app
 
 - (instancetype)init {
     return [super initWithFeatureName:@"设备截屏"];
 }
 
-- (void)dealloc {
-    // 确保没有任何 dangling C 指针
-    _currentScreenshot = nil;
-}
-
 #pragma mark - View Lifecycle
 
 - (void)viewDidLoad {
-    [super viewDidLoad];
+    // 不调 [super viewDidLoad]，因为我们用 setupUI 完全自定义布局，
+    // 不需要 FeatureViewController 的占位 label。
+    self.view.wantsLayer = YES;
     [self setupUI];
-    [self refreshDeviceStatus];
+    [self updateStatusForConnection];
+}
+
+- (void)viewDidConnect {
+    [super viewDidConnect];
+    [self updateStatusForConnection];
+}
+
+- (void)viewDidDisconnect {
+    [super viewDidDisconnect];
+    [self updateStatusForConnection];
+}
+
+#pragma mark - Connection
+
+- (MyUltronClient *)client {
+    return ((ViewController *)self.parentViewController).client;
+}
+
+- (void)updateStatusForConnection {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        if (self.client.isConnected) {
+            self.statusLabel.stringValue = @"已连接，点击截屏";
+            self.captureButton.enabled = YES;
+        } else {
+            self.statusLabel.stringValue = @"未连接，请先在 iOS 设备上启动 App 并连接";
+            self.captureButton.enabled = NO;
+        }
+    });
 }
 
 #pragma mark - UI Setup
@@ -66,7 +88,7 @@
     [self.view addSubview:_imageView];
 
     // ---- 截屏按钮 ----
-    _captureButton = [NSButton buttonWithTitle:@"📸 截屏"
+    _captureButton = [NSButton buttonWithTitle:@"截屏"
                                         target:self
                                         action:@selector(captureScreenshot:)];
     _captureButton.bezelStyle = NSBezelStyleRounded;
@@ -74,7 +96,7 @@
     [self.view addSubview:_captureButton];
 
     // ---- 保存按钮 ----
-    _saveButton = [NSButton buttonWithTitle:@"💾 保存"
+    _saveButton = [NSButton buttonWithTitle:@"保存"
                                      target:self
                                      action:@selector(saveScreenshot:)];
     _saveButton.bezelStyle = NSBezelStyleRounded;
@@ -90,7 +112,7 @@
     _statusLabel.backgroundColor = [NSColor clearColor];
     _statusLabel.textColor  = [NSColor secondaryLabelColor];
     _statusLabel.font       = [NSFont systemFontOfSize:12];
-    _statusLabel.stringValue = @"正在检测设备…";
+    _statusLabel.stringValue = @"正在检测连接…";
     _statusLabel.translatesAutoresizingMaskIntoConstraints = NO;
     [self.view addSubview:_statusLabel];
 
@@ -104,185 +126,84 @@
 
     // ---- Auto Layout ----
     [NSLayoutConstraint activateConstraints:@[
-        // 截图预览：顶部留边距，左右撑开
         [_imageView.topAnchor     constraintEqualToAnchor:self.view.topAnchor    constant:20],
         [_imageView.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:20],
         [_imageView.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-20],
+        [_imageView.bottomAnchor  constraintLessThanOrEqualToAnchor:_captureButton.topAnchor constant:-16],
 
-        // 截屏按钮
         [_captureButton.topAnchor     constraintEqualToAnchor:_imageView.bottomAnchor constant:16],
         [_captureButton.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
 
-        // 状态标签
         [_statusLabel.topAnchor      constraintEqualToAnchor:_captureButton.bottomAnchor constant:12],
         [_statusLabel.centerXAnchor  constraintEqualToAnchor:self.view.centerXAnchor],
 
-        // 加载指示器（状态标签右侧）
         [_spinner.leadingAnchor  constraintEqualToAnchor:_statusLabel.trailingAnchor constant:6],
         [_spinner.centerYAnchor  constraintEqualToAnchor:_statusLabel.centerYAnchor],
 
-        // 保存按钮（底部）
         [_saveButton.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
         [_saveButton.bottomAnchor  constraintEqualToAnchor:self.view.bottomAnchor constant:-20],
     ]];
 }
 
-#pragma mark - Device Detection
-
-- (void)refreshDeviceStatus {
-    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-        char **devices = NULL;
-        int count = 0;
-        idevice_error_t ret = idevice_get_device_list(&devices, &count);
-
-        // Extract UDID in background thread BEFORE freeing the device list
-        NSString *udid = nil;
-        if (ret == IDEVICE_E_SUCCESS && count > 0 && devices[0]) {
-            udid = [NSString stringWithUTF8String:devices[0]];
-        }
-
-        if (devices) {
-            idevice_device_list_free(devices);
-        }
-
-        dispatch_async(dispatch_get_main_queue(), ^{
-            if (!udid) {
-                self.statusLabel.stringValue = @"未检测到 iOS 设备，请通过 USB 或 WiFi 连接";
-                self.captureButton.enabled = NO;
-                return;
-            }
-
-            self.deviceUDID = udid;
-            self.statusLabel.stringValue = [NSString stringWithFormat:@"已连接: %@", udid];
-            self.captureButton.enabled = YES;
-        });
-    });
-}
-
-#pragma mark - Screenshot Capture
+#pragma mark - Screenshot Capture (TCP)
 
 - (void)captureScreenshot:(NSButton *)sender {
+    if (!self.client.isConnected) {
+        self.statusLabel.stringValue = @"未连接，请先连接设备";
+        return;
+    }
+
     sender.enabled = NO;
     self.saveButton.enabled = NO;
     self.statusLabel.stringValue = @"正在截屏…";
     [self.spinner startAnimation:nil];
 
-    // libimobiledevice 调用均为阻塞式，放在后台线程执行
-    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-        NSImage *screenshot = [self captureScreenshotFromDevice];
-        NSString *errorMsg  = nil;
-
-        if (!screenshot) {
-            errorMsg = @"截屏失败，请确认设备已解锁且信任此电脑";
-        }
-
-        dispatch_async(dispatch_get_main_queue(), ^{
-            [self.spinner stopAnimation:nil];
-            sender.enabled = YES;
-
-            if (screenshot) {
-                self.currentScreenshot = screenshot;
-                self.imageView.image = screenshot;
-                self.saveButton.enabled = YES;
-
-                NSSize size = screenshot.size;
-                self.statusLabel.stringValue = [NSString stringWithFormat:
-                    @"截屏成功 — %.0f × %.0f 像素", size.width, size.height];
-            } else {
-                self.statusLabel.stringValue = errorMsg;
-            }
-        });
-    });
+    NSLog(@"[ScreenshotMac] Sending screenshot request via TCP...");
+    [self sendMessage:@"screenshot" content:@{}];
 }
 
-/// 在后台线程调用 — 通过 libimobiledevice 获取截屏
-- (nullable NSImage *)captureScreenshotFromDevice {
-    idevice_t device = NULL;
-    lockdownd_client_t lockdown = NULL;
-    screenshotr_client_t screenshotr = NULL;
-    char *imgdata = NULL;
-    uint64_t imgsize = 0;
-    NSImage *result = nil;
+- (void)sendMessage:(NSString *)type content:(NSDictionary *)content {
+    [self.client sendMessage:@{
+        kMsgVersion: @"1.0",
+        kMsgType:    type,
+        kMsgContent: content,
+    }];
+}
 
-    const char *udid = self.deviceUDID.UTF8String;
-    if (!udid) {
-        NSLog(@"[Screenshot] 未选择设备");
-        return nil;
+#pragma mark - Receiving Binary Screenshot Data
+
+/// 接收到 iOS 端回传的 PNG 二进制数据。
+- (void)didReceiveBinaryData:(NSData *)data {
+    NSLog(@"[ScreenshotMac] didReceiveBinaryData: %lu bytes", (unsigned long)(data ? data.length : 0));
+
+    if (!data || data.length == 0) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [self.spinner stopAnimation:nil];
+            self.captureButton.enabled = YES;
+            self.statusLabel.stringValue = @"截屏失败：收到空数据";
+        });
+        return;
     }
 
-    idevice_error_t ret;
-    lockdownd_error_t lerr;
-    screenshotr_error_t serr;
-    lockdownd_service_descriptor_t svcDesc = NULL;
+    NSImage *image = [[NSImage alloc] initWithData:data];
+    NSLog(@"[ScreenshotMac] NSImage created: %@, size: %@", image, image ? NSStringFromSize(image.size) : @"nil");
 
-    // ---- 1. 连接设备 ----
-    ret = idevice_new_with_options(&device, udid,
-                                   IDEVICE_LOOKUP_USBMUX | IDEVICE_LOOKUP_NETWORK);
-    if (ret != IDEVICE_E_SUCCESS) {
-        NSLog(@"[Screenshot] 连接设备失败: %d", ret);
-        goto cleanup;
-    }
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [self.spinner stopAnimation:nil];
+        self.captureButton.enabled = YES;
 
-    // ---- 3. 配对 & 创建 lockdown 会话 ----
-    lerr = lockdownd_client_new_with_handshake(device, &lockdown, "MyUltron");
-    if (lerr != LOCKDOWN_E_SUCCESS) {
-        NSLog(@"[Screenshot] lockdown 握手失败: %d — 请在设备上点击「信任」", lerr);
-        goto cleanup;
-    }
-
-    // ---- 4. 启动 screenshotr 服务 ----
-    lerr = lockdownd_start_service(lockdown, SCREENSHOTR_SERVICE_NAME, &svcDesc);
-    if (lerr != LOCKDOWN_E_SUCCESS) {
-        NSLog(@"[Screenshot] 启动截图服务失败: %d (需挂载开发者镜像)", lerr);
-        goto cleanup;
-    }
-
-    // ---- 5. 连接 screenshotr ----
-    serr = screenshotr_client_new(device, svcDesc, &screenshotr);
-    lockdownd_service_descriptor_free(svcDesc);
-    svcDesc = NULL;
-
-    if (serr != SCREENSHOTR_E_SUCCESS) {
-        NSLog(@"[Screenshot] screenshotr 连接失败: %d", serr);
-        goto cleanup;
-    }
-
-    // ---- 6. 执行截屏 ----
-    serr = screenshotr_take_screenshot(screenshotr, &imgdata, &imgsize);
-    if (serr != SCREENSHOTR_E_SUCCESS || imgsize == 0) {
-        NSLog(@"[Screenshot] 截屏失败: %d", serr);
-        goto cleanup;
-    }
-
-    NSLog(@"[Screenshot] 截屏成功: %llu bytes (TIFF)", imgsize);
-
-    // ---- 7. TIFF → NSImage ----
-    {
-        NSData *tiffData = [NSData dataWithBytesNoCopy:imgdata
-                                                length:(NSUInteger)imgsize
-                                          freeWhenDone:NO];
-        result = [[NSImage alloc] initWithData:tiffData];
-        if (!result) {
-            NSLog(@"[Screenshot] TIFF 解析失败");
+        if (image) {
+            self.currentScreenshot = image;
+            self.imageView.image = image;
+            [self.imageView setNeedsDisplay:YES];
+            self.saveButton.enabled = YES;
+            NSSize size = image.size;
+            self.statusLabel.stringValue = [NSString stringWithFormat:
+                @"截屏成功 — %.0f × %.0f 像素", size.width, size.height];
+        } else {
+            self.statusLabel.stringValue = @"截屏失败：无法解析图像数据";
         }
-    }
-
-cleanup:
-    // ---- 8. 清理资源 ----
-    if (imgdata) {
-        free(imgdata);
-    }
-    if (screenshotr) {
-        screenshotr_client_free(screenshotr);
-    }
-    if (lockdown) {
-        lockdownd_client_free(lockdown);
-    }
-    if (device) {
-        idevice_free(device);
-    }
-
-    return result;
+    });
 }
 
 #pragma mark - Save Screenshot
@@ -301,7 +222,6 @@ cleanup:
         NSURL *url = panel.URL;
         NSString *ext = url.pathExtension.lowercaseString;
 
-        // TIFF → target format
         CGImageRef cgImage = [self.currentScreenshot CGImageForProposedRect:NULL
                                                                     context:nil
                                                                       hints:nil];
