@@ -93,8 +93,8 @@
     _textView = [[NSTextView alloc] initWithFrame:sv.bounds];
     _textView.editable = NO;
     _textView.font = [NSFont monospacedSystemFontOfSize:10.5 weight:NSFontWeightRegular];
-    _textView.backgroundColor = [NSColor colorWithWhite:0.12 alpha:1.0];
-    _textView.textColor = [NSColor colorWithRed:0.4 green:1.0 blue:0.4 alpha:1.0];
+    _textView.backgroundColor = [NSColor textBackgroundColor];
+    _textView.textColor = [NSColor systemGreenColor];
     _textView.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
     _textView.string = @"点击 ▶ 开始捕获日志\n";
     sv.documentView = _textView;
@@ -271,7 +271,7 @@
 }
 
 - (void)appendLog:(NSString *)line {
-    NSColor *green = [NSColor colorWithRed:0.4 green:1.0 blue:0.4 alpha:1.0];
+    NSColor *green = [NSColor systemGreenColor];
     // Keep last ~3000 lines
     NSArray *lines = [_textView.string componentsSeparatedByString:@"\n"];
     if (lines.count > 3000) {

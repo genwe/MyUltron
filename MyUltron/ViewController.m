@@ -171,9 +171,8 @@ static NSString * const kPrefFeatureConfig = @"MyUltronFeatureConfig";
     self.containerView = [[NSView alloc] initWithFrame:containerFrame];
     self.containerView.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable | NSViewMinYMargin;
     self.containerView.wantsLayer = YES;
-    self.containerView.layer.backgroundColor = [[NSColor controlBackgroundColor] CGColor];
     self.containerView.layer.borderWidth = 1;
-    self.containerView.layer.borderColor = [[NSColor separatorColor] CGColor];
+    [self updateLayerColors];
     [self.view addSubview:self.containerView];
 
     // Register drag-and-drop for .app / .ipa files
@@ -183,6 +182,27 @@ static NSString * const kPrefFeatureConfig = @"MyUltronFeatureConfig";
     self.serverPort = [AppDelegate serverPort];
     self.client = [[MyUltronClient alloc] init];
     self.client.delegate = self;
+
+    // 监听外观变化，自动更新 layer 颜色
+    [self.view addObserver:self forKeyPath:@"effectiveAppearance" options:0 context:NULL];
+}
+
+- (void)dealloc {
+    [self.view removeObserver:self forKeyPath:@"effectiveAppearance"];
+}
+
+- (void)updateLayerColors {
+    self.containerView.layer.backgroundColor = [[NSColor controlBackgroundColor] CGColor];
+    self.containerView.layer.borderColor     = [[NSColor separatorColor] CGColor];
+}
+
+- (void)observeValueForKeyPath:(NSString *)keyPath
+                      ofObject:(id)object
+                        change:(NSDictionary *)change
+                       context:(void *)context {
+    if ([keyPath isEqualToString:@"effectiveAppearance"]) {
+        [self updateLayerColors];
+    }
 }
 
 #pragma mark - Feature Config
@@ -931,7 +951,7 @@ static NSString * const kPrefFeatureConfig = @"MyUltronFeatureConfig";
     // Container view for rounded background
     NSView *container = [[NSView alloc] initWithFrame:NSMakeRect(0, 0, 220, 36)];
     container.wantsLayer = YES;
-    container.layer.backgroundColor = [[NSColor colorWithWhite:0 alpha:0.75] CGColor];
+    container.layer.backgroundColor = [[NSColor windowBackgroundColor] CGColor];
     container.layer.cornerRadius = 8;
     container.layer.masksToBounds = YES;
 
@@ -943,7 +963,7 @@ static NSString * const kPrefFeatureConfig = @"MyUltronFeatureConfig";
     label.selectable = NO;
     label.drawsBackground = NO;
     label.alignment = NSTextAlignmentCenter;
-    label.textColor = [NSColor whiteColor];
+    label.textColor = [NSColor labelColor];
     label.font = [NSFont systemFontOfSize:14];
     [container addSubview:label];
 
