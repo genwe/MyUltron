@@ -184,16 +184,24 @@ static NSString * const kPrefFeatureConfig = @"MyUltronFeatureConfig";
     self.client.delegate = self;
 
     // 监听外观变化，自动更新 layer 颜色
-    [self.view addObserver:self forKeyPath:@"effectiveAppearance" options:0 context:NULL];
+    [NSApp addObserver:self forKeyPath:@"effectiveAppearance" options:0 context:NULL];
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(updateLayerColors)
+                                                 name:NSSystemColorsDidChangeNotification
+                                               object:nil];
 }
 
 - (void)dealloc {
-    [self.view removeObserver:self forKeyPath:@"effectiveAppearance"];
+    [NSApp removeObserver:self forKeyPath:@"effectiveAppearance"];
+    [[NSNotificationCenter defaultCenter] removeObserver:self];
 }
 
 - (void)updateLayerColors {
-    self.containerView.layer.backgroundColor = [[NSColor controlBackgroundColor] CGColor];
-    self.containerView.layer.borderColor     = [[NSColor separatorColor] CGColor];
+    [NSApp.effectiveAppearance performAsCurrentDrawingAppearance:^{
+        self.containerView.layer.backgroundColor = [[NSColor controlBackgroundColor] CGColor];
+        self.containerView.layer.borderColor     = [[NSColor separatorColor] CGColor];
+    }];
+    self.containerView.needsDisplay = YES;
 }
 
 - (void)observeValueForKeyPath:(NSString *)keyPath

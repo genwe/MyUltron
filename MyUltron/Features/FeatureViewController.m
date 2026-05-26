@@ -24,7 +24,6 @@
 
 - (void)viewDidLoad {
     [super viewDidLoad];
-    self.view.wantsLayer = YES;
 
     NSTextField *label = [[NSTextField alloc] initWithFrame:NSZeroRect];
     label.stringValue = [NSString stringWithFormat:@"%@ - 待实现", self.featureName];

@@ -49,7 +49,6 @@ static NSString * const kDefaultPayload =
 #pragma mark - View Lifecycle
 
 - (void)viewDidLoad {
-    self.view.wantsLayer = YES;
     [self setupUI];
     [self updateStatusForConnection];
 }
@@ -105,6 +104,9 @@ static NSString * const kDefaultPayload =
     _textView = [[NSTextView alloc] initWithFrame:NSZeroRect];
     _textView.font = [NSFont monospacedSystemFontOfSize:12 weight:NSFontWeightRegular];
     _textView.string = kDefaultPayload;
+    _textView.backgroundColor = [NSColor textBackgroundColor];
+    _textView.textColor = [NSColor textColor];
+    _textView.insertionPointColor = [NSColor textColor];
     _textView.automaticQuoteSubstitutionEnabled = NO;
     _textView.automaticDashSubstitutionEnabled = NO;
 

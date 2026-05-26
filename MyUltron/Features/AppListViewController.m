@@ -38,7 +38,6 @@
 
 - (void)viewDidLoad {
     [super viewDidLoad];
-    self.view.wantsLayer = YES;
     _rows = [NSMutableArray array];
     [self setupUI];
     [self refreshAppList];

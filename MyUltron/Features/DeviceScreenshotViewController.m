@@ -43,6 +43,7 @@ static NSString * const kMsgContent = @"content";
     // 不调 [super viewDidLoad]，因为我们用 setupUI 完全自定义布局，
     // 不需要 FeatureViewController 的占位 label。
     self.view.wantsLayer = YES;
+    self.view.layerContentsRedrawPolicy = NSViewLayerContentsRedrawOnSetNeedsDisplay;
     [self setupUI];
     [self updateStatusForConnection];
 }
@@ -78,8 +79,6 @@ static NSString * const kMsgContent = @"content";
 #pragma mark - UI Setup
 
 - (void)setupUI {
-    self.view.wantsLayer = YES;
-
     // ---- 截图预览区域 ----
     _imageView = [[NSImageView alloc] initWithFrame:NSZeroRect];
     _imageView.imageScaling     = NSImageScaleProportionallyUpOrDown;
