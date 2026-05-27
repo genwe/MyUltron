@@ -87,6 +87,7 @@ static NSString * const kPrefFeatureConfig = @"MyUltronFeatureConfig";
 @property (nonatomic, strong) NSMutableArray<NSString *> *featureItems;
 @property (nonatomic, strong) NSMutableArray<Class>     *featureClasses;
 @property (nonatomic, strong) FeatureViewController *currentFeatureVC;
+@property (nonatomic, strong) NSMutableDictionary<NSString *, FeatureViewController *> *featureVCCache;
 
 // Settings
 @property (nonatomic, strong) NSButton *settingsButton;
@@ -934,19 +935,32 @@ static NSString * const kPrefFeatureConfig = @"MyUltronFeatureConfig";
 }
 
 - (void)showFeatureAtIndex:(NSInteger)index {
+    // 隐藏当前 VC（不销毁，保留状态）
     if (self.currentFeatureVC) {
         [self.currentFeatureVC.view removeFromSuperview];
-        [self.currentFeatureVC removeFromParentViewController];
-        self.currentFeatureVC = nil;
     }
 
     NSArray *classes = [self featureClasses];
     Class cls = classes[index];
-    FeatureViewController *vc = [[cls alloc] init];
-    vc.deviceUDID = self.selectedUDID;
-    vc.isSimulator = self.selectedIsSimulator;
-    vc.appBundleID = self.selectedAppBundleID;
-    [self addChildViewController:vc];
+    NSString *key = NSStringFromClass(cls);
+
+    // 懒加载缓存
+    if (!self.featureVCCache) {
+        self.featureVCCache = [NSMutableDictionary dictionary];
+    }
+
+    // 从缓存取，没有则创建
+    FeatureViewController *vc = self.featureVCCache[key];
+    if (!vc) {
+        vc = [[cls alloc] init];
+        vc.deviceUDID = self.selectedUDID;
+        vc.isSimulator = self.selectedIsSimulator;
+        vc.appBundleID = self.selectedAppBundleID;
+        [self addChildViewController:vc];
+        self.featureVCCache[key] = vc;
+    }
+
+    // 显示
     vc.view.frame = self.containerView.bounds;
     vc.view.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
     [self.containerView addSubview:vc.view];
@@ -956,10 +970,12 @@ static NSString * const kPrefFeatureConfig = @"MyUltronFeatureConfig";
 #pragma mark - Toast
 
 - (void)showToast:(NSString *)message {
-    // Container view for rounded background
-    NSView *container = [[NSView alloc] initWithFrame:NSMakeRect(0, 0, 220, 36)];
+    // 毛玻璃背景容器 — 浅色/深色模式下都清晰可见
+    NSVisualEffectView *container = [[NSVisualEffectView alloc] initWithFrame:NSMakeRect(0, 0, 220, 36)];
+    container.blendingMode = NSVisualEffectBlendingModeBehindWindow;
+    container.material = NSVisualEffectMaterialHUDWindow;
+    container.state = NSVisualEffectStateActive;
     container.wantsLayer = YES;
-    container.layer.backgroundColor = [[NSColor windowBackgroundColor] CGColor];
     container.layer.cornerRadius = 8;
     container.layer.masksToBounds = YES;
 
