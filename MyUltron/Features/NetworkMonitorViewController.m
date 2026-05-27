@@ -19,7 +19,6 @@ static NSString * const kMsgContent = @"content";
 @property (nonatomic, strong) NSScrollView      *scrollView;
 @property (nonatomic, strong) NSButton          *toggleButton;
 @property (nonatomic, strong) NSButton          *clearButton;
-@property (nonatomic, strong) NSButton          *refreshButton;
 @property (nonatomic, strong) NSTextField       *statusLabel;
 
 @property (nonatomic, strong) NSMutableArray<NSDictionary *> *entries;
@@ -27,12 +26,16 @@ static NSString * const kMsgContent = @"content";
 
 // Detail area
 @property (nonatomic, strong) NSTextField       *detailLabel;
+@property (nonatomic, strong) NSSegmentedControl *detailSegment;
 @property (nonatomic, strong) NSScrollView      *detailScrollView;
 @property (nonatomic, strong) NSTextView        *detailTextView;
+@property (nonatomic, strong) NSDictionary       *selectedEntry;
 
 @end
 
-@implementation NetworkMonitorViewController
+@implementation NetworkMonitorViewController {
+    NSInteger _detailCategory;
+}
 
 #pragma mark - Init
 
@@ -53,14 +56,11 @@ static NSString * const kMsgContent = @"content";
     self.view.wantsLayer = YES;
     [self setupUI];
     [self updateStatusForConnection];
-    // 拉取已有请求列表（后续增量由实时推送驱动）
-    [self fetchData];
 }
 
 - (void)viewDidConnect {
     [super viewDidConnect];
     [self updateStatusForConnection];
-    [self fetchData];
 }
 
 - (void)viewDidDisconnect {
@@ -80,12 +80,10 @@ static NSString * const kMsgContent = @"content";
             self.statusLabel.stringValue = [NSString stringWithFormat:@"已连接 | %lu 条请求",
                                             (unsigned long)self.entries.count];
             self.toggleButton.enabled = YES;
-            self.refreshButton.enabled = YES;
             self.clearButton.enabled = YES;
         } else {
             self.statusLabel.stringValue = @"未连接";
             self.toggleButton.enabled = NO;
-            self.refreshButton.enabled = NO;
             self.clearButton.enabled = NO;
         }
     });
@@ -108,13 +106,6 @@ static NSString * const kMsgContent = @"content";
     _clearButton.bezelStyle = NSBezelStyleRounded;
     _clearButton.translatesAutoresizingMaskIntoConstraints = NO;
     [self.view addSubview:_clearButton];
-
-    _refreshButton = [NSButton buttonWithTitle:@"刷新"
-                                        target:self
-                                        action:@selector(fetchData)];
-    _refreshButton.bezelStyle = NSBezelStyleRounded;
-    _refreshButton.translatesAutoresizingMaskIntoConstraints = NO;
-    [self.view addSubview:_refreshButton];
 
     _statusLabel = [[NSTextField alloc] initWithFrame:NSZeroRect];
     _statusLabel.editable = NO;
@@ -167,6 +158,15 @@ static NSString * const kMsgContent = @"content";
     _detailLabel.translatesAutoresizingMaskIntoConstraints = NO;
     [self.view addSubview:_detailLabel];
 
+    // ---- 详情分类切换 ----
+    _detailSegment = [NSSegmentedControl segmentedControlWithLabels:@[
+        @"请求头", @"请求体", @"响应头", @"响应体"
+    ] trackingMode:NSSegmentSwitchTrackingSelectOne target:self action:@selector(detailCategoryChanged:)];
+    _detailSegment.selectedSegment = 0;
+    _detailSegment.translatesAutoresizingMaskIntoConstraints = NO;
+    [self.view addSubview:_detailSegment];
+
+    // ---- 详情内容 ----
     _detailScrollView = [[NSScrollView alloc] initWithFrame:NSZeroRect];
     _detailScrollView.borderType = NSBezelBorder;
     _detailScrollView.hasVerticalScroller = YES;
@@ -188,9 +188,6 @@ static NSString * const kMsgContent = @"content";
         [_clearButton.centerYAnchor constraintEqualToAnchor:_toggleButton.centerYAnchor],
         [_clearButton.leadingAnchor constraintEqualToAnchor:_toggleButton.trailingAnchor constant:8],
 
-        [_refreshButton.centerYAnchor constraintEqualToAnchor:_toggleButton.centerYAnchor],
-        [_refreshButton.leadingAnchor constraintEqualToAnchor:_clearButton.trailingAnchor constant:8],
-
         [_statusLabel.centerYAnchor  constraintEqualToAnchor:_toggleButton.centerYAnchor],
         [_statusLabel.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-12],
 
@@ -199,10 +196,14 @@ static NSString * const kMsgContent = @"content";
         [_scrollView.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-12],
         [_scrollView.heightAnchor   constraintEqualToConstant:220],
 
-        [_detailLabel.topAnchor     constraintEqualToAnchor:_scrollView.bottomAnchor constant:10],
-        [_detailLabel.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:12],
+        [_detailLabel.topAnchor      constraintEqualToAnchor:_scrollView.bottomAnchor constant:10],
+        [_detailLabel.leadingAnchor  constraintEqualToAnchor:self.view.leadingAnchor constant:12],
 
-        [_detailScrollView.topAnchor      constraintEqualToAnchor:_detailLabel.bottomAnchor constant:4],
+        [_detailSegment.topAnchor     constraintEqualToAnchor:_detailLabel.bottomAnchor constant:4],
+        [_detailSegment.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:12],
+        [_detailSegment.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-12],
+
+        [_detailScrollView.topAnchor      constraintEqualToAnchor:_detailSegment.bottomAnchor constant:6],
         [_detailScrollView.leadingAnchor  constraintEqualToAnchor:self.view.leadingAnchor constant:12],
         [_detailScrollView.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-12],
         [_detailScrollView.bottomAnchor   constraintEqualToAnchor:self.view.bottomAnchor constant:-12],
@@ -222,14 +223,9 @@ static NSString * const kMsgContent = @"content";
 - (void)clearEntries:(NSButton *)sender {
     [self.entries removeAllObjects];
     [self.tableView reloadData];
+    _selectedEntry = nil;
     self.detailTextView.string = @"";
-    [self sendMessage:@"networkMonitor" content:@{@"action": @"clear"}];
     [self updateStatusForConnection];
-}
-
-- (void)fetchData {
-    if (!self.client.isConnected) return;
-    [self sendMessage:@"networkMonitor" content:@{@"action": @"fetch"}];
 }
 
 #pragma mark - Messaging
@@ -252,7 +248,6 @@ static NSString * const kMsgContent = @"content";
         NSString *action = content[@"action"];
 
         if ([action isEqualToString:@"push"]) {
-            // 实时推送：增量追加单条，不刷新整个列表
             NSDictionary *entry = content[@"entry"];
             if ([entry isKindOfClass:[NSDictionary class]]) {
                 [self.entries addObject:entry];
@@ -263,24 +258,11 @@ static NSString * const kMsgContent = @"content";
                                       withAnimation:NSTableViewAnimationEffectNone];
                 [self updateStatusForConnection];
             }
-        } else {
-            // fetch / start / stop：全量替换
-            if (![content[@"success"] boolValue]) return;
+        }
 
-            NSArray *newEntries = content[@"entries"];
-            if (![newEntries isKindOfClass:[NSArray class]]) return;
-
-            self.isMonitoring = [content[@"monitoring"] boolValue];
-
-            [self.entries removeAllObjects];
-            [self.entries addObjectsFromArray:newEntries];
-            [self.tableView reloadData];
-            [self updateStatusForConnection];
-
-            NSInteger sel = self.tableView.selectedRow;
-            if (sel >= 0 && sel < (NSInteger)self.entries.count) {
-                [self showDetailForRow:sel];
-            }
+        // start / stop 响应：更新监控状态
+        if (content[@"monitoring"]) {
+            _isMonitoring = [content[@"monitoring"] boolValue];
         }
     });
 }
@@ -363,16 +345,43 @@ static NSString * const kMsgContent = @"content";
 #pragma mark - Detail
 
 - (void)showDetailForRow:(NSInteger)row {
-    NSDictionary *e = self.entries[row];
-    NSMutableString *s = [NSMutableString string];
-    [s appendFormat:@"%@ %@\n", e[@"method"], e[@"url"]];
-    [s appendFormat:@"Status: %@ | Duration: %.0f ms | Req: %@ | Resp: %@\n\n",
-     e[@"statusCode"], [e[@"duration"] doubleValue] * 1000,
-     [self formatBytes:[e[@"requestSize"] unsignedIntegerValue]],
-     [self formatBytes:[e[@"responseSize"] unsignedIntegerValue]]];
-    [s appendFormat:@"--- Request Headers ---\n%@\n\n", e[@"requestHeaders"]];
-    [s appendFormat:@"--- Response Headers ---\n%@\n", e[@"responseHeaders"]];
-    self.detailTextView.string = s;
+    _selectedEntry = self.entries[row];
+    [self refreshDetail];
+}
+
+- (void)detailCategoryChanged:(NSSegmentedControl *)sender {
+    _detailCategory = sender.selectedSegment;
+    [self refreshDetail];
+}
+
+- (void)refreshDetail {
+    if (!_selectedEntry) {
+        self.detailTextView.string = @"";
+        return;
+    }
+    NSDictionary *e = _selectedEntry;
+    NSString *content = @"";
+
+    switch (_detailCategory) {
+        case 0: // 请求头
+            content = [e[@"requestHeaders"] length] ? e[@"requestHeaders"] : @"(empty)";
+            break;
+        case 1: { // 请求体
+            NSString *reqBody = e[@"requestBody"];
+            content = reqBody.length > 0 ? reqBody : @"(empty)";
+            break;
+        }
+        case 2: // 响应头
+            content = [e[@"responseHeaders"] length] ? e[@"responseHeaders"] : @"(empty)";
+            break;
+        case 3: { // 响应体
+            NSString *respBody = e[@"responseBody"];
+            content = respBody.length > 0 ? respBody : @"(empty)";
+            break;
+        }
+    }
+
+    self.detailTextView.string = content;
 }
 
 #pragma mark - Helpers
