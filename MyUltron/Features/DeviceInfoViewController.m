@@ -137,6 +137,11 @@
 
     if (self.isSimulator) {
         [self fetchSimulatorInfo:udid];
+        // 无论 xcrun 是否成功，至少显示基本 UDID
+        if (_rows.count == 0) {
+            [_rows addObject:@{@"label": @"设备号 (UDID)", @"value": udid}];
+            [_rows addObject:@{@"label": @"设备类型", @"value": @"iOS 模拟器"}];
+        }
         return;
     }
 
@@ -234,14 +239,45 @@
     NSPipe *pipe = [NSPipe pipe];
     task.standardOutput = pipe;
     task.standardError = [NSPipe pipe];
-    [task launch];
-    [task waitUntilExit];
+
+    NSError *launchError = nil;
+    [task launchAndReturnError:&launchError];
+    if (launchError) {
+        NSLog(@"[DeviceInfo] xcrun launch failed: %@", launchError);
+        return;
+    }
+
+    // 最多等 3 秒，防止卡死
+    dispatch_semaphore_t sem = dispatch_semaphore_create(0);
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        [task waitUntilExit];
+        dispatch_semaphore_signal(sem);
+    });
+    if (dispatch_semaphore_wait(sem, dispatch_time(DISPATCH_TIME_NOW, 3 * NSEC_PER_SEC)) != 0) {
+        [task terminate];
+        NSLog(@"[DeviceInfo] xcrun timed out");
+        return;
+    }
+
+    if (task.terminationStatus != 0) {
+        NSLog(@"[DeviceInfo] xcrun exited with status: %d", task.terminationStatus);
+        return;
+    }
 
     NSData *data = [pipe.fileHandleForReading readDataToEndOfFile];
-    NSDictionary *json = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
+    NSError *jsonErr = nil;
+    NSDictionary *json = [NSJSONSerialization JSONObjectWithData:data options:0 error:&jsonErr];
+    if (jsonErr) {
+        NSLog(@"[DeviceInfo] xcrun JSON parse error: %@", jsonErr);
+        return;
+    }
     NSDictionary *runtimes = json[@"devices"];
-    if (![runtimes isKindOfClass:[NSDictionary class]]) return;
+    if (![runtimes isKindOfClass:[NSDictionary class]]) {
+        NSLog(@"[DeviceInfo] xcrun output missing 'devices' key");
+        return;
+    }
 
+    NSLog(@"[DeviceInfo] Searching for simulator UDID: %@", udid);
     NSDictionary *foundDevice = nil;
     NSString *foundRuntime = nil;
     for (NSString *runtimeKey in runtimes) {
@@ -258,7 +294,12 @@
         if (foundDevice) break;
     }
 
-    if (!foundDevice) return;
+    if (!foundDevice) {
+        NSLog(@"[DeviceInfo] Simulator UDID not found in xcrun output");
+        return;
+    }
+
+    NSLog(@"[DeviceInfo] Found simulator: %@", foundDevice[@"name"]);
 
     [_rows addObject:@{@"label": @"设备号 (UDID)", @"value": udid}];
     [_rows addObject:@{@"label": @"设备名称", @"value": foundDevice[@"name"] ?: @"—"}];
