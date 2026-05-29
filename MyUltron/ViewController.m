@@ -965,6 +965,11 @@ static NSString * const kPrefFeatureConfig = @"MyUltronFeatureConfig";
     vc.view.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
     [self.containerView addSubview:vc.view];
     self.currentFeatureVC = vc;
+
+    // 重新检查连接状态（缓存复用时 viewDidConnect 不会再次触发）
+    if (self.client.isConnected && [vc respondsToSelector:@selector(viewDidConnect)]) {
+        [vc viewDidConnect];
+    }
 }
 
 #pragma mark - Toast

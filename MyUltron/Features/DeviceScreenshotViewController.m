@@ -124,23 +124,25 @@ static NSString * const kMsgContent = @"content";
     [self.view addSubview:_spinner];
 
     // ---- Auto Layout ----
+    // 按钮在底部：截屏(左) 保存(右)  状态标签(中上)
+    // imageView 填满上部空间
     [NSLayoutConstraint activateConstraints:@[
-        [_imageView.topAnchor     constraintEqualToAnchor:self.view.topAnchor    constant:20],
-        [_imageView.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:20],
-        [_imageView.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-20],
-        [_imageView.bottomAnchor  constraintLessThanOrEqualToAnchor:_captureButton.topAnchor constant:-16],
+        [_captureButton.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:20],
+        [_captureButton.bottomAnchor  constraintEqualToAnchor:self.view.bottomAnchor constant:-20],
 
-        [_captureButton.topAnchor     constraintEqualToAnchor:_imageView.bottomAnchor constant:16],
-        [_captureButton.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
+        [_saveButton.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-20],
+        [_saveButton.bottomAnchor   constraintEqualToAnchor:self.view.bottomAnchor constant:-20],
 
-        [_statusLabel.topAnchor      constraintEqualToAnchor:_captureButton.bottomAnchor constant:12],
-        [_statusLabel.centerXAnchor  constraintEqualToAnchor:self.view.centerXAnchor],
+        [_statusLabel.bottomAnchor constraintEqualToAnchor:_captureButton.topAnchor constant:-8],
+        [_statusLabel.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
 
         [_spinner.leadingAnchor  constraintEqualToAnchor:_statusLabel.trailingAnchor constant:6],
         [_spinner.centerYAnchor  constraintEqualToAnchor:_statusLabel.centerYAnchor],
 
-        [_saveButton.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
-        [_saveButton.bottomAnchor  constraintEqualToAnchor:self.view.bottomAnchor constant:-20],
+        [_imageView.topAnchor     constraintEqualToAnchor:self.view.topAnchor constant:20],
+        [_imageView.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:20],
+        [_imageView.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-20],
+        [_imageView.bottomAnchor  constraintEqualToAnchor:_statusLabel.topAnchor constant:-8],
     ]];
 }
 
