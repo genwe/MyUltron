@@ -23,7 +23,7 @@
 + (BOOL)requiresApp      { return NO; }
 
 - (instancetype)init {
-    return [super initWithFeatureName:@"编解码"];
+    return [super initWithFeatureName:NSLocalizedString(@"编解码", nil)];
 }
 
 - (void)viewDidLoad {

@@ -8,7 +8,7 @@
 @implementation EnvironmentSwitchViewController
 
 - (instancetype)init {
-    return [super initWithFeatureName:@"环境切换"];
+    return [super initWithFeatureName:NSLocalizedString(@"环境切换", nil)];
 }
 
 @end

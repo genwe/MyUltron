@@ -64,7 +64,7 @@ static NSString * const kTypeSandboxDelete    = @"sandboxDelete";
 @implementation SandboxViewController
 
 - (instancetype)init {
-    self = [super initWithFeatureName:@"沙盒管理"];
+    self = [super initWithFeatureName:NSLocalizedString(@"沙盒管理", nil)];
     if (self) {
         _entries     = [NSMutableArray array];
         _pathHistory = [NSMutableArray array];
@@ -82,7 +82,7 @@ static NSString * const kTypeSandboxDelete    = @"sandboxDelete";
     if (self.client.isConnected) {
         [self requestDirectoryListing];
     } else {
-        [self setStatus:@"未连接 — 请先选择设备 → 选择 App"];
+        [self setStatus:NSLocalizedString(NSLocalizedString(NSLocalizedString(@"未连接 — 请先选择设备 → 选择 App", nil), nil), nil)];
     }
 }
 
@@ -94,7 +94,7 @@ static NSString * const kTypeSandboxDelete    = @"sandboxDelete";
 }
 
 - (void)viewDidDisconnect {
-    [self setStatus:@"连接已断开"];
+    [self setStatus:NSLocalizedString(@"连接已断开", nil)];
 }
 
 #pragma mark - UI Construction
@@ -116,29 +116,29 @@ static NSString * const kTypeSandboxDelete    = @"sandboxDelete";
     y += 1;
 
     // ---- Back (up) button ----
-    self.backButton = [self buttonWithTitle:@"← 返回" width:52 x:&x y:y];
+    self.backButton = [self buttonWithTitle:NSLocalizedString(@"← 返回", nil) width:52 x:&x y:y];
     self.backButton.action = @selector(navigateUp:);
 
     // ---- Refresh ----
-    self.refreshButton = [self buttonWithTitle:@"↻ 刷新" width:52 x:&x y:y];
+    self.refreshButton = [self buttonWithTitle:NSLocalizedString(@"↻ 刷新", nil) width:52 x:&x y:y];
     self.refreshButton.action = @selector(refreshListing:);
 
     // ---- New folder ----
-    self.addFolderButton = [self buttonWithTitle:@"＋ 新建文件夹" width:80 x:&x y:y];
+    self.addFolderButton = [self buttonWithTitle:NSLocalizedString(@"＋ 新建文件夹", nil) width:80 x:&x y:y];
     self.addFolderButton.action = @selector(createFolder:);
 
     // ---- Delete ----
-    self.deleteButton = [self buttonWithTitle:@"✕ 删除" width:52 x:&x y:y];
+    self.deleteButton = [self buttonWithTitle:NSLocalizedString(@"✕ 删除", nil) width:52 x:&x y:y];
     self.deleteButton.action = @selector(deleteSelected:);
 
     x += 8;
 
     // ---- Upload ----
-    self.uploadButton = [self buttonWithTitle:@"↑ 上传" width:52 x:&x y:y];
+    self.uploadButton = [self buttonWithTitle:NSLocalizedString(@"↑ 上传", nil) width:52 x:&x y:y];
     self.uploadButton.action = @selector(uploadFile:);
 
     // ---- Download ----
-    self.downloadButton = [self buttonWithTitle:@"↓ 下载" width:52 x:&x y:y];
+    self.downloadButton = [self buttonWithTitle:NSLocalizedString(@"↓ 下载", nil) width:52 x:&x y:y];
     self.downloadButton.action = @selector(downloadFile:);
 
     // ---- Table view ----
@@ -156,10 +156,10 @@ static NSString * const kTypeSandboxDelete    = @"sandboxDelete";
     self.tableView.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
 
     NSArray *cols = @[
-        @{@"id": @"type", @"title": @"类型",   @"w": @80},
-        @{@"id": @"name", @"title": @"名称",   @"w": @200},
-        @{@"id": @"size", @"title": @"大小",   @"w": @80},
-        @{@"id": @"date", @"title": @"修改时间", @"w": @150},
+        @{@"id": @"type", @"title": NSLocalizedString(@"类型", nil),   @"w": @80},
+        @{@"id": @"name", @"title": NSLocalizedString(@"名称", nil),   @"w": @200},
+        @{@"id": @"size", @"title": NSLocalizedString(@"大小", nil),   @"w": @80},
+        @{@"id": @"date", @"title": NSLocalizedString(@"修改时间", nil), @"w": @150},
     ];
     for (NSDictionary *c in cols) {
         NSTableColumn *col = [[NSTableColumn alloc] initWithIdentifier:c[@"id"]];
@@ -244,7 +244,7 @@ static NSString * const kTypeSandboxDelete    = @"sandboxDelete";
     NSString *value = @"";
     if ([colID isEqualToString:@"name"])  value = e.name;
     else if ([colID isEqualToString:@"size"])  value = e.isDir ? @"--" : [self formatSize:e.size];
-    else if ([colID isEqualToString:@"type"])  value = e.isDir ? @"文件夹" : [e.name pathExtension];
+    else if ([colID isEqualToString:@"type"])  value = e.isDir ? NSLocalizedString(@"文件夹", nil) : [e.name pathExtension];
     else if ([colID isEqualToString:@"date"])  value = e.modDate ?: @"--";
 
     cell.textField.stringValue = value;
@@ -297,12 +297,12 @@ static NSString * const kTypeSandboxDelete    = @"sandboxDelete";
 
 - (void)createFolder:(id)sender {
     NSAlert *alert = [[NSAlert alloc] init];
-    alert.messageText = @"新建文件夹";
-    [alert addButtonWithTitle:@"创建"];
-    [alert addButtonWithTitle:@"取消"];
+    alert.messageText = NSLocalizedString(@"新建文件夹", nil);
+    [alert addButtonWithTitle:NSLocalizedString(@"创建", nil)];
+    [alert addButtonWithTitle:NSLocalizedString(NSLocalizedString(@"取消", nil), nil)];
 
     NSTextField *input = [[NSTextField alloc] initWithFrame:NSMakeRect(0, 0, 240, 24)];
-    input.placeholderString = @"文件夹名称";
+    input.placeholderString = NSLocalizedString(@"文件夹名称", nil);
     alert.accessoryView = input;
 
     [alert beginSheetModalForWindow:self.view.window completionHandler:^(NSModalResponse code) {
@@ -324,14 +324,14 @@ static NSString * const kTypeSandboxDelete    = @"sandboxDelete";
         }
     }];
     if (rows.count > 3) {
-        itemList = [itemList stringByAppendingFormat:@"\n... 等 %lu 项", (unsigned long)rows.count];
+        itemList = [itemList stringByAppendingFormat:NSLocalizedString(@"\n... 等 %lu 项", nil), (unsigned long)rows.count];
     }
 
     NSAlert *alert = [[NSAlert alloc] init];
-    alert.messageText = @"确认删除";
-    alert.informativeText = [NSString stringWithFormat:@"将删除:%@", itemList];
-    [alert addButtonWithTitle:@"删除"];
-    [alert addButtonWithTitle:@"取消"];
+    alert.messageText = NSLocalizedString(@"确认删除", nil);
+    alert.informativeText = [NSString stringWithFormat:NSLocalizedString(@"将删除:%@", nil), itemList];
+    [alert addButtonWithTitle:NSLocalizedString(@"删除", nil)];
+    [alert addButtonWithTitle:NSLocalizedString(NSLocalizedString(@"取消", nil), nil)];
     alert.alertStyle = NSAlertStyleWarning;
 
     [alert beginSheetModalForWindow:self.view.window completionHandler:^(NSModalResponse code) {
@@ -381,7 +381,7 @@ static NSString * const kTypeSandboxDelete    = @"sandboxDelete";
         self.pendingDownloadDir  = [localPath stringByDeletingLastPathComponent];
 
         // Send download request to the server
-        [self setStatus:[NSString stringWithFormat:@"下载中: %@ ...", e.name]];
+        [self setStatus:[NSString stringWithFormat:NSLocalizedString(@"下载中: %@ ...", nil), e.name]];
         [self sendMessage:@"sandboxDownload" content:@{@"path": e.path}];
     }];
 }
@@ -394,7 +394,7 @@ static NSString * const kTypeSandboxDelete    = @"sandboxDelete";
 
 - (void)sendMessage:(NSString *)type content:(NSDictionary *)content {
     if (!self.client.isConnected) {
-        [self setStatus:@"未连接 — 请先选择设备 → 选择 App"];
+        [self setStatus:NSLocalizedString(NSLocalizedString(NSLocalizedString(@"未连接 — 请先选择设备 → 选择 App", nil), nil), nil)];
         return;
     }
     [self.client sendMessage:@{
@@ -406,7 +406,7 @@ static NSString * const kTypeSandboxDelete    = @"sandboxDelete";
 
 - (void)requestDirectoryListing {
     if (!self.client.isConnected) {
-        [self setStatus:@"未连接 — 请先选择设备 → 选择 App"];
+        [self setStatus:NSLocalizedString(NSLocalizedString(NSLocalizedString(@"未连接 — 请先选择设备 → 选择 App", nil), nil), nil)];
         return;
     }
 
@@ -414,7 +414,7 @@ static NSString * const kTypeSandboxDelete    = @"sandboxDelete";
     [self.pathField setStringValue:self.currentPath];
     self.entries = [NSMutableArray array];
     [self.tableView reloadData];
-    [self setStatus:@"加载中..."];
+    [self setStatus:NSLocalizedString(@"加载中...", nil)];
 
     NSLog(@"[Sandbox] Requesting listing for: %@ (connected=%d)",
           self.currentPath, self.client.isConnected);
@@ -442,7 +442,7 @@ static NSString * const kTypeSandboxDelete    = @"sandboxDelete";
 - (void)handleDownloadResponse:(NSDictionary *)content {
     BOOL success = [content[@"success"] boolValue];
     if (!success) {
-        [self setStatus:[NSString stringWithFormat:@"下载失败: %@", content[@"error"] ?: @"未知"]];
+        [self setStatus:[NSString stringWithFormat:NSLocalizedString(@"下载失败: %@", nil), content[@"error"] ?: @"未知"]];
         self.pendingDownloadName = nil;
         return;
     }
@@ -457,9 +457,9 @@ static NSString * const kTypeSandboxDelete    = @"sandboxDelete";
     NSError *error = nil;
     BOOL ok = [data writeToFile:filePath options:NSDataWritingAtomic error:&error];
     if (ok) {
-        [self setStatus:[NSString stringWithFormat:@"已下载: %@", self.pendingDownloadName]];
+        [self setStatus:[NSString stringWithFormat:NSLocalizedString(@"已下载: %@", nil), self.pendingDownloadName]];
     } else {
-        [self setStatus:[NSString stringWithFormat:@"保存失败: %@", error.localizedDescription]];
+        [self setStatus:[NSString stringWithFormat:NSLocalizedString(@"保存失败: %@", nil), error.localizedDescription]];
     }
     self.pendingDownloadName = nil;
     self.pendingDownloadDir  = nil;
@@ -491,7 +491,7 @@ static NSString * const kTypeSandboxDelete    = @"sandboxDelete";
     }];
 
     [self.tableView reloadData];
-    [self setStatus:[NSString stringWithFormat:@"%lu 个项目", (unsigned long)self.entries.count]];
+    [self setStatus:[NSString stringWithFormat:NSLocalizedString(@"%lu 个项目", nil), (unsigned long)self.entries.count]];
 }
 
 - (void)handleCreateDirResponse:(NSDictionary *)content {
@@ -499,7 +499,7 @@ static NSString * const kTypeSandboxDelete    = @"sandboxDelete";
     if (success) {
         [self requestDirectoryListing];
     } else {
-        [self setStatus:[NSString stringWithFormat:@"创建失败: %@", content[@"error"] ?: @"未知错误"]];
+        [self setStatus:[NSString stringWithFormat:NSLocalizedString(@"创建失败: %@", nil), content[@"error"] ?: NSLocalizedString(NSLocalizedString(@"未知错误", nil), nil)]];
     }
 }
 
@@ -508,7 +508,7 @@ static NSString * const kTypeSandboxDelete    = @"sandboxDelete";
     if (success) {
         [self requestDirectoryListing];
     } else {
-        [self setStatus:[NSString stringWithFormat:@"删除失败: %@", content[@"error"] ?: @"未知错误"]];
+        [self setStatus:[NSString stringWithFormat:NSLocalizedString(@"删除失败: %@", nil), content[@"error"] ?: NSLocalizedString(NSLocalizedString(@"未知错误", nil), nil)]];
     }
 }
 

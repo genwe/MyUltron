@@ -8,7 +8,7 @@
 @implementation XlogParserViewController
 
 - (instancetype)init {
-    return [super initWithFeatureName:@"解析xlog"];
+    return [super initWithFeatureName:NSLocalizedString(@"解析xlog", nil)];
 }
 
 @end

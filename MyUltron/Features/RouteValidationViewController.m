@@ -8,7 +8,7 @@
 @implementation RouteValidationViewController
 
 - (instancetype)init {
-    return [super initWithFeatureName:@"路由校验"];
+    return [super initWithFeatureName:NSLocalizedString(@"路由校验", nil)];
 }
 
 @end

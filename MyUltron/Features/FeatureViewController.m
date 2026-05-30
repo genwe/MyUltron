@@ -26,7 +26,7 @@
     [super viewDidLoad];
 
     NSTextField *label = [[NSTextField alloc] initWithFrame:NSZeroRect];
-    label.stringValue = [NSString stringWithFormat:@"%@ - 待实现", self.featureName];
+    label.stringValue = [NSString stringWithFormat:NSLocalizedString(@"%@ - 待实现", nil), self.featureName];
     label.editable = NO;
     label.bordered = NO;
     label.selectable = NO;

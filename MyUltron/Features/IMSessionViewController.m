@@ -8,7 +8,7 @@
 @implementation IMSessionViewController
 
 - (instancetype)init {
-    return [super initWithFeatureName:@"IM会话监控"];
+    return [super initWithFeatureName:NSLocalizedString(@"IM会话监控", nil)];
 }
 
 @end

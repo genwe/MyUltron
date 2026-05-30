@@ -8,7 +8,7 @@
 @implementation CrashLogViewController
 
 - (instancetype)init {
-    return [super initWithFeatureName:@"崩溃日志"];
+    return [super initWithFeatureName:NSLocalizedString(@"崩溃日志", nil)];
 }
 
 @end

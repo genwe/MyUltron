@@ -8,7 +8,7 @@
 @implementation AnalyticsMonitorViewController
 
 - (instancetype)init {
-    return [super initWithFeatureName:@"埋点监控"];
+    return [super initWithFeatureName:NSLocalizedString(@"埋点监控", nil)];
 }
 
 @end

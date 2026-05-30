@@ -34,7 +34,7 @@ static NSString * const kMsgContent = @"content";
 + (BOOL)requiresApp { return YES; }   // 需要 TCP 连接到运行中的 iOS app
 
 - (instancetype)init {
-    return [super initWithFeatureName:@"设备截屏"];
+    return [super initWithFeatureName:NSLocalizedString(@"设备截屏", nil)];
 }
 
 #pragma mark - View Lifecycle
@@ -67,10 +67,10 @@ static NSString * const kMsgContent = @"content";
 - (void)updateStatusForConnection {
     dispatch_async(dispatch_get_main_queue(), ^{
         if (self.client.isConnected) {
-            self.statusLabel.stringValue = @"已连接，点击截屏";
+            self.statusLabel.stringValue = NSLocalizedString(@"已连接，点击截屏", nil);
             self.captureButton.enabled = YES;
         } else {
-            self.statusLabel.stringValue = @"未连接，请先在 iOS 设备上启动 App 并连接";
+            self.statusLabel.stringValue = NSLocalizedString(@"未连接，请先在 iOS 设备上启动 App 并连接", nil);
             self.captureButton.enabled = NO;
         }
     });
@@ -87,7 +87,7 @@ static NSString * const kMsgContent = @"content";
     [self.view addSubview:_imageView];
 
     // ---- 截屏按钮 ----
-    _captureButton = [NSButton buttonWithTitle:@"截屏"
+    _captureButton = [NSButton buttonWithTitle:NSLocalizedString(@"截屏", nil)
                                         target:self
                                         action:@selector(captureScreenshot:)];
     _captureButton.bezelStyle = NSBezelStyleRounded;
@@ -95,7 +95,7 @@ static NSString * const kMsgContent = @"content";
     [self.view addSubview:_captureButton];
 
     // ---- 保存按钮 ----
-    _saveButton = [NSButton buttonWithTitle:@"保存"
+    _saveButton = [NSButton buttonWithTitle:NSLocalizedString(@"保存", nil)
                                      target:self
                                      action:@selector(saveScreenshot:)];
     _saveButton.bezelStyle = NSBezelStyleRounded;
@@ -111,7 +111,7 @@ static NSString * const kMsgContent = @"content";
     _statusLabel.backgroundColor = [NSColor clearColor];
     _statusLabel.textColor  = [NSColor secondaryLabelColor];
     _statusLabel.font       = [NSFont systemFontOfSize:12];
-    _statusLabel.stringValue = @"正在检测连接…";
+    _statusLabel.stringValue = NSLocalizedString(@"正在检测连接…", nil);
     _statusLabel.translatesAutoresizingMaskIntoConstraints = NO;
     [self.view addSubview:_statusLabel];
 
@@ -150,13 +150,13 @@ static NSString * const kMsgContent = @"content";
 
 - (void)captureScreenshot:(NSButton *)sender {
     if (!self.client.isConnected) {
-        self.statusLabel.stringValue = @"未连接，请先连接设备";
+        self.statusLabel.stringValue = NSLocalizedString(@"未连接，请先连接设备", nil);
         return;
     }
 
     sender.enabled = NO;
     self.saveButton.enabled = NO;
-    self.statusLabel.stringValue = @"正在截屏…";
+    self.statusLabel.stringValue = NSLocalizedString(@"正在截屏…", nil);
     [self.spinner startAnimation:nil];
 
     NSLog(@"[ScreenshotMac] Sending screenshot request via TCP...");
@@ -181,7 +181,7 @@ static NSString * const kMsgContent = @"content";
         dispatch_async(dispatch_get_main_queue(), ^{
             [self.spinner stopAnimation:nil];
             self.captureButton.enabled = YES;
-            self.statusLabel.stringValue = @"截屏失败：收到空数据";
+            self.statusLabel.stringValue = NSLocalizedString(@"截屏失败：收到空数据", nil);
         });
         return;
     }
@@ -200,9 +200,9 @@ static NSString * const kMsgContent = @"content";
             self.saveButton.enabled = YES;
             NSSize size = image.size;
             self.statusLabel.stringValue = [NSString stringWithFormat:
-                @"截屏成功 — %.0f × %.0f 像素", size.width, size.height];
+                NSLocalizedString(@"截屏成功 — %.0f × %.0f 像素", nil), size.width, size.height];
         } else {
-            self.statusLabel.stringValue = @"截屏失败：无法解析图像数据";
+            self.statusLabel.stringValue = NSLocalizedString(@"截屏失败：无法解析图像数据", nil);
         }
     });
 }
@@ -213,7 +213,7 @@ static NSString * const kMsgContent = @"content";
     if (!self.currentScreenshot) return;
 
     NSSavePanel *panel = [NSSavePanel savePanel];
-    panel.title                = @"保存截屏";
+    panel.title                = NSLocalizedString(@"保存截屏", nil);
     panel.nameFieldStringValue = @"Screenshot.png";
     panel.allowedFileTypes     = @[@"png", @"jpg", @"jpeg"];
 
@@ -245,10 +245,10 @@ static NSString * const kMsgContent = @"content";
             dispatch_async(dispatch_get_main_queue(), ^{
                 if (writeErr) {
                     self.statusLabel.stringValue =
-                        [NSString stringWithFormat:@"保存失败: %@", writeErr.localizedDescription];
+                        [NSString stringWithFormat:NSLocalizedString(@"保存失败: %@", nil), writeErr.localizedDescription];
                 } else {
                     self.statusLabel.stringValue =
-                        [NSString stringWithFormat:@"已保存到 %@", url.lastPathComponent];
+                        [NSString stringWithFormat:NSLocalizedString(@"已保存到 %@", nil), url.lastPathComponent];
                 }
             });
         }

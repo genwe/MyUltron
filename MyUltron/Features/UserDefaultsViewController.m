@@ -39,7 +39,7 @@ static NSString * const kMsgContent = @"content";
 @implementation UserDefaultsViewController
 
 - (instancetype)init {
-    self = [super initWithFeatureName:@"UserDefault数据"];
+    self = [super initWithFeatureName:NSLocalizedString(@"UserDefault数据", nil)];
     if (self) {
         _entries = [NSMutableArray array];
     }
@@ -50,7 +50,7 @@ static NSString * const kMsgContent = @"content";
     [super viewDidLoad];
     [self buildUI];
     if (self.client.isConnected) [self requestList];
-    else [self setStatus:@"未连接"];
+    else [self setStatus:NSLocalizedString(@"未连接", nil)];
 }
 
 - (void)viewDidConnect { if (!self.loaded) [self requestList]; }
@@ -63,9 +63,9 @@ static NSString * const kMsgContent = @"content";
 
     self.addButton = [self button:@"＋ 新增" x:margin y:y action:@selector(addKey:)];
     CGFloat x = NSMaxX(self.addButton.frame) + 8;
-    self.editButton = [self button:@"✎ 编辑" x:x y:y action:@selector(editKey:)];
+    self.editButton = [self button:NSLocalizedString(@"✎ 编辑", nil) x:x y:y action:@selector(editKey:)];
     x = NSMaxX(self.editButton.frame) + 8;
-    self.deleteButton = [self button:@"✕ 删除" x:x y:y action:@selector(deleteKey:)];
+    self.deleteButton = [self button:NSLocalizedString(@"✕ 删除", nil) x:x y:y action:@selector(deleteKey:)];
 
     CGFloat tableTop = y - 8;
     NSRect tableFrame = NSMakeRect(margin, 32,
@@ -149,8 +149,8 @@ static NSString * const kMsgContent = @"content";
 #pragma mark - Actions
 
 - (void)addKey:(id)sender {
-    [self showEditor:@"新增" key:@"" value:@"" type:@"String" handler:^(NSString *k, NSString *v, NSString *t) {
-        [self setStatus:@"保存中..."];
+    [self showEditor:NSLocalizedString(@"新增", nil) key:@"" value:@"" type:@"String" handler:^(NSString *k, NSString *v, NSString *t) {
+        [self setStatus:NSLocalizedString(NSLocalizedString(@"保存中...", nil), nil)];
         [self send:@"userDefaultsSet" content:@{@"key":k, @"value":v, @"type":t}];
     }];
 }
@@ -159,8 +159,8 @@ static NSString * const kMsgContent = @"content";
     NSInteger row = self.tableView.selectedRow;
     if (row < 0) return;
     UDEntry *e = self.entries[row];
-    [self showEditor:@"编辑" key:e.key value:e.preview type:e.type handler:^(NSString *k, NSString *v, NSString *t) {
-        [self setStatus:@"保存中..."];
+    [self showEditor:NSLocalizedString(@"编辑", nil) key:e.key value:e.preview type:e.type handler:^(NSString *k, NSString *v, NSString *t) {
+        [self setStatus:NSLocalizedString(NSLocalizedString(@"保存中...", nil), nil)];
         [self send:@"userDefaultsSet" content:@{@"key":k, @"value":v, @"type":t}];
     }];
 }
@@ -170,13 +170,13 @@ static NSString * const kMsgContent = @"content";
     if (row < 0) return;
     UDEntry *e = self.entries[row];
     NSAlert *a = [[NSAlert alloc] init];
-    a.messageText = [NSString stringWithFormat:@"删除 \"%@\" ?", e.key];
+    a.messageText = [NSString stringWithFormat:NSLocalizedString(NSLocalizedString(@"删除 \"%@\" ?", nil), nil), e.key];
     a.alertStyle = NSAlertStyleWarning;
-    [a addButtonWithTitle:@"删除"];
-    [a addButtonWithTitle:@"取消"];
+    [a addButtonWithTitle:NSLocalizedString(@"删除", nil)];
+    [a addButtonWithTitle:NSLocalizedString(NSLocalizedString(@"取消", nil), nil)];
     [a beginSheetModalForWindow:self.view.window completionHandler:^(NSModalResponse code) {
         if (code != NSAlertFirstButtonReturn) return;
-        [self setStatus:@"删除中..."];
+        [self setStatus:NSLocalizedString(@"删除中...", nil)];
         [self send:@"userDefaultsDelete" content:@{@"key":e.key}];
     }];
 }
@@ -189,8 +189,8 @@ static NSString * const kMsgContent = @"content";
 {
     NSAlert *a = [[NSAlert alloc] init];
     a.messageText = title;
-    [a addButtonWithTitle:@"确定"];
-    [a addButtonWithTitle:@"取消"];
+    [a addButtonWithTitle:NSLocalizedString(@"确定", nil)];
+    [a addButtonWithTitle:NSLocalizedString(NSLocalizedString(@"取消", nil), nil)];
 
     NSView *container = [[NSView alloc] initWithFrame:NSMakeRect(0, 0, 340, 90)];
 
@@ -214,7 +214,7 @@ static NSString * const kMsgContent = @"content";
 
     NSTextField *tl = [[NSTextField alloc] initWithFrame:NSMakeRect(250, 36, 36, 20)];
     tl.editable = NO; tl.bordered = NO; tl.drawsBackground = NO;
-    tl.stringValue = @"类型:"; tl.font = [NSFont systemFontOfSize:11];
+    tl.stringValue = NSLocalizedString(@"类型:", nil); tl.font = [NSFont systemFontOfSize:11];
     [container addSubview:tl];
 
     NSPopUpButton *typePopup = [[NSPopUpButton alloc] initWithFrame:NSMakeRect(250, 6, 86, 22)];
@@ -241,7 +241,7 @@ static NSString * const kMsgContent = @"content";
 }
 
 - (void)requestList {
-    [self setStatus:@"加载中..."];
+    [self setStatus:NSLocalizedString(@"加载中...", nil)];
     [self send:@"userDefaultsList" content:@{}];
 }
 

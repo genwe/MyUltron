@@ -8,7 +8,7 @@
 @implementation DatabaseViewController
 
 - (instancetype)init {
-    return [super initWithFeatureName:@"数据库"];
+    return [super initWithFeatureName:NSLocalizedString(@"数据库", nil)];
 }
 
 @end

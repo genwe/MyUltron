@@ -31,7 +31,7 @@
 + (BOOL)requiresApp      { return YES; }
 
 - (instancetype)init {
-    return [super initWithFeatureName:@"日志监控"];
+    return [super initWithFeatureName:NSLocalizedString(@"日志监控", nil)];
 }
 
 - (void)viewDidLoad {
@@ -63,21 +63,21 @@
     [self.view addSubview:_keywordField];
 
     // Start/Stop button
-    _startStopBtn = [NSButton buttonWithTitle:@"▶ 开始" target:self action:@selector(toggleCapture:)];
+    _startStopBtn = [NSButton buttonWithTitle:NSLocalizedString(NSLocalizedString(@"▶ 开始", nil), nil) target:self action:@selector(toggleCapture:)];
     _startStopBtn.frame = NSMakeRect(248, y - 26, 70, 26);
     _startStopBtn.bezelStyle = NSBezelStyleRounded;
     _startStopBtn.autoresizingMask = NSViewMaxXMargin | NSViewMinYMargin;
     [self.view addSubview:_startStopBtn];
 
     // Clear button
-    _clearBtn = [NSButton buttonWithTitle:@"清空" target:self action:@selector(clearLog:)];
+    _clearBtn = [NSButton buttonWithTitle:NSLocalizedString(@"清空", nil) target:self action:@selector(clearLog:)];
     _clearBtn.frame = NSMakeRect(322, y - 26, 56, 26);
     _clearBtn.bezelStyle = NSBezelStyleRounded;
     _clearBtn.autoresizingMask = NSViewMaxXMargin | NSViewMinYMargin;
     [self.view addSubview:_clearBtn];
 
     // Auto scroll toggle
-    _autoScrollBtn = [NSButton buttonWithTitle:@"自动滚屏" target:self action:@selector(toggleAutoScroll:)];
+    _autoScrollBtn = [NSButton buttonWithTitle:NSLocalizedString(@"自动滚屏", nil) target:self action:@selector(toggleAutoScroll:)];
     _autoScrollBtn.frame = NSMakeRect(382, y - 26, 86, 26);
     [_autoScrollBtn setButtonType:NSButtonTypeSwitch];
     _autoScrollBtn.state = NSControlStateValueOn;
@@ -96,7 +96,7 @@
     _textView.backgroundColor = [NSColor textBackgroundColor];
     _textView.textColor = [NSColor systemGreenColor];
     _textView.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
-    _textView.string = @"点击 ▶ 开始捕获日志\n";
+    _textView.string = NSLocalizedString(@"点击 ▶ 开始捕获日志\n", nil);
     sv.documentView = _textView;
 }
 
@@ -111,12 +111,12 @@
 - (void)startCapture {
     if (_running) return;
     if (self.deviceUDID.length == 0) {
-        [self appendLog:@"[错误] 请先选择设备"];
+        [self appendLog:NSLocalizedString(@"[错误] 请先选择设备", nil)];
         return;
     }
     _running = YES;
-    _startStopBtn.title = @"■ 停止";
-    _textView.string = @"正在连接设备…\n";
+    _startStopBtn.title = NSLocalizedString(@"■ 停止", nil);
+    _textView.string = NSLocalizedString(@"正在连接设备…\n", nil);
 
     // Auto-set filter from selected app's bundle ID if not manually set
     if (_filterField.stringValue.length == 0 && self.appBundleID.length > 0) {
@@ -130,7 +130,7 @@
 
     const char *udid = self.deviceUDID.UTF8String;
     if (!udid || strlen(udid) == 0) {
-        dispatch_async(dispatch_get_main_queue(), ^{ [self appendLog:@"[错误] 无效的设备 UDID"]; [self stopCapture]; });
+        dispatch_async(dispatch_get_main_queue(), ^{ [self appendLog:NSLocalizedString(@"[错误] 无效的设备 UDID", nil)]; [self stopCapture]; });
         return;
     }
 
@@ -138,7 +138,7 @@
     dispatch_async(self.captureQueue, ^{
         idevice_t device = NULL;
         if (idevice_new_with_options(&device, udid, IDEVICE_LOOKUP_USBMUX) != IDEVICE_E_SUCCESS) {
-            dispatch_async(dispatch_get_main_queue(), ^{ [self appendLog:@"[错误] 无法连接设备"]; [self stopCapture]; });
+            dispatch_async(dispatch_get_main_queue(), ^{ [self appendLog:NSLocalizedString(@"[错误] 无法连接设备", nil)]; [self stopCapture]; });
             return;
         }
 
@@ -146,7 +146,7 @@
         syslog_relay_error_t serr = syslog_relay_client_start_service(device, &syslog, "MyUltron");
         if (serr != SYSLOG_RELAY_E_SUCCESS) {
             dispatch_async(dispatch_get_main_queue(), ^{
-                [self appendLog:[NSString stringWithFormat:@"[错误] syslog_relay 启动失败: %d", serr]];
+                [self appendLog:[NSString stringWithFormat:NSLocalizedString(@"[错误] syslog_relay 启动失败: %d", nil), serr]];
                 [self stopCapture];
             });
             idevice_free(device);
@@ -154,11 +154,11 @@
         }
 
         dispatch_async(dispatch_get_main_queue(), ^{
-            [self appendLog:@"[信息] 已连接，等待日志…"];
+            [self appendLog:NSLocalizedString(@"[信息] 已连接，等待日志…", nil)];
             NSString *bid = self->_filterField.stringValue;
             NSString *kw  = self->_keywordField.stringValue;
-            if (bid.length > 0) [self appendLog:[NSString stringWithFormat:@"[信息] Bundle ID: %@", bid]];
-            if (kw.length > 0)  [self appendLog:[NSString stringWithFormat:@"[信息] 关键字: %@", kw]];
+            if (bid.length > 0) [self appendLog:[NSString stringWithFormat:NSLocalizedString(NSLocalizedString(@"[信息] Bundle ID: %@", nil), nil), bid]];
+            if (kw.length > 0)  [self appendLog:[NSString stringWithFormat:NSLocalizedString(NSLocalizedString(@"[信息] 关键字: %@", nil), nil), kw]];
         });
 
         // Capture filter strings on main thread (thread-safe copies)
@@ -193,7 +193,7 @@
         idevice_free(device);
 
         dispatch_async(dispatch_get_main_queue(), ^{
-            [self appendLog:@"[信息] 日志流已断开"];
+            [self appendLog:NSLocalizedString(@"[信息] 日志流已断开", nil)];
             [self stopCapture];
         });
     });
@@ -202,17 +202,17 @@
 - (void)startSimulatorLogStream {
     NSString *udid = self.deviceUDID;
     if (udid.length == 0) {
-        [self appendLog:@"[错误] 无效的模拟器 UDID"];
+        [self appendLog:NSLocalizedString(@"[错误] 无效的模拟器 UDID", nil)];
         [self stopCapture];
         return;
     }
 
     dispatch_async(dispatch_get_main_queue(), ^{
-        [self appendLog:[NSString stringWithFormat:@"[信息] 启动模拟器日志流 (UDID: %@)", udid]];
+        [self appendLog:[NSString stringWithFormat:NSLocalizedString(@"[信息] 启动模拟器日志流 (UDID: %@)", nil), udid]];
         NSString *bid = self->_filterField.stringValue;
         NSString *kw  = self->_keywordField.stringValue;
-        if (bid.length > 0) [self appendLog:[NSString stringWithFormat:@"[信息] Bundle ID: %@", bid]];
-        if (kw.length > 0)  [self appendLog:[NSString stringWithFormat:@"[信息] 关键字: %@", kw]];
+        if (bid.length > 0) [self appendLog:[NSString stringWithFormat:NSLocalizedString(NSLocalizedString(@"[信息] Bundle ID: %@", nil), nil), bid]];
+        if (kw.length > 0)  [self appendLog:[NSString stringWithFormat:NSLocalizedString(NSLocalizedString(@"[信息] 关键字: %@", nil), nil), kw]];
     });
 
     // Already on main thread — read filter strings directly
@@ -246,7 +246,7 @@
         [task launchAndReturnError:&err];
         if (err) {
             dispatch_async(dispatch_get_main_queue(), ^{
-                [self appendLog:[NSString stringWithFormat:@"[错误] 启动失败: %@", err.localizedDescription]];
+                [self appendLog:[NSString stringWithFormat:NSLocalizedString(@"[错误] 启动失败: %@", nil), err.localizedDescription]];
                 [self stopCapture];
             });
             return;
@@ -254,7 +254,7 @@
         [task waitUntilExit];
 
         dispatch_async(dispatch_get_main_queue(), ^{
-            [self appendLog:@"[信息] 模拟器日志流已关闭"];
+            [self appendLog:NSLocalizedString(@"[信息] 模拟器日志流已关闭", nil)];
             [self stopCapture];
         });
     });
@@ -266,7 +266,7 @@
         _captureQueue = nil;
     }
     _running = NO;
-    _startStopBtn.title = @"▶ 开始";
+    _startStopBtn.title = NSLocalizedString(NSLocalizedString(@"▶ 开始", nil), nil);
     _captureQueue = nil;
 }
 

@@ -8,7 +8,7 @@
 @implementation MMKVViewController
 
 - (instancetype)init {
-    return [super initWithFeatureName:@"MMKV数据"];
+    return [super initWithFeatureName:NSLocalizedString(@"MMKV数据", nil)];
 }
 
 @end

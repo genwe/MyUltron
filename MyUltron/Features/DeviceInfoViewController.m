@@ -31,7 +31,7 @@
 + (BOOL)requiresApp      { return NO; }
 
 - (instancetype)init {
-    return [super initWithFeatureName:@"设备信息"];
+    return [super initWithFeatureName:NSLocalizedString(@"设备信息", nil)];
 }
 
 #pragma mark - View Lifecycle
@@ -54,7 +54,7 @@
     _statusLabel.backgroundColor = [NSColor clearColor];
     _statusLabel.textColor = [NSColor secondaryLabelColor];
     _statusLabel.font = [NSFont systemFontOfSize:12];
-    _statusLabel.stringValue = @"正在加载设备信息…";
+    _statusLabel.stringValue = NSLocalizedString(@"正在加载设备信息…", nil);
     _statusLabel.translatesAutoresizingMaskIntoConstraints = NO;
     [self.view addSubview:_statusLabel];
 
@@ -82,14 +82,14 @@
     _tableView.rowSizeStyle = NSTableViewRowSizeStyleCustom;
 
     NSTableColumn *labelCol = [[NSTableColumn alloc] initWithIdentifier:@"label"];
-    labelCol.title = @"属性";
+    labelCol.title = NSLocalizedString(@"属性", nil);
     labelCol.width = 160;
     labelCol.minWidth = 120;
     labelCol.resizingMask = NSTableColumnUserResizingMask;
     [_tableView addTableColumn:labelCol];
 
     NSTableColumn *valueCol = [[NSTableColumn alloc] initWithIdentifier:@"value"];
-    valueCol.title = @"值";
+    valueCol.title = NSLocalizedString(@"值", nil);
     valueCol.minWidth = 200;
     valueCol.resizingMask = NSTableColumnAutoresizingMask | NSTableColumnUserResizingMask;
     [_tableView addTableColumn:valueCol];
@@ -121,9 +121,9 @@
             [_spinner stopAnimation:nil];
             [_tableView reloadData];
             if (_rows.count == 0) {
-                _statusLabel.stringValue = @"未连接设备或无法获取设备信息";
+                _statusLabel.stringValue = NSLocalizedString(@"未连接设备或无法获取设备信息", nil);
             } else {
-                _statusLabel.stringValue = [NSString stringWithFormat:@"共 %lu 条记录", (unsigned long)_rows.count];
+                _statusLabel.stringValue = [NSString stringWithFormat:NSLocalizedString(@"共 %lu 条记录", nil), (unsigned long)_rows.count];
             }
         });
     });
@@ -139,8 +139,8 @@
         [self fetchSimulatorInfo:udid];
         // 无论 xcrun 是否成功，至少显示基本 UDID
         if (_rows.count == 0) {
-            [_rows addObject:@{@"label": @"设备号 (UDID)", @"value": udid}];
-            [_rows addObject:@{@"label": @"设备类型", @"value": @"iOS 模拟器"}];
+            [_rows addObject:@{@"label": NSLocalizedString(NSLocalizedString(NSLocalizedString(@"设备号 (UDID)", nil), nil), nil), @"value": udid}];
+            [_rows addObject:@{@"label": NSLocalizedString(NSLocalizedString(@"设备类型", nil), nil), @"value": NSLocalizedString(@"iOS 模拟器", nil)}];
         }
         return;
     }
@@ -154,7 +154,7 @@
     if (ret != IDEVICE_E_SUCCESS) {
         NSLog(@"[DeviceInfo] idevice_new failed: %d", ret);
         dispatch_async(dispatch_get_main_queue(), ^{
-            _statusLabel.stringValue = @"无法连接设备";
+            _statusLabel.stringValue = NSLocalizedString(@"无法连接设备", nil);
         });
         return;
     }
@@ -165,7 +165,7 @@
         NSLog(@"[DeviceInfo] lockdown handshake failed: %d", lerr);
         idevice_free(device);
         dispatch_async(dispatch_get_main_queue(), ^{
-            _statusLabel.stringValue = @"Lockdown 握手失败，请确认设备已信任此电脑";
+            _statusLabel.stringValue = NSLocalizedString(@"Lockdown 握手失败，请确认设备已信任此电脑", nil);
         });
         return;
     }
@@ -188,22 +188,22 @@
     }
 
     // ---- 获取设备基本信息 (read from allValues dict directly) ----
-    [_rows addObject:@{@"label": @"设备号 (UDID)", @"value": self.deviceUDID ?: @""}];
+    [_rows addObject:@{@"label": NSLocalizedString(NSLocalizedString(NSLocalizedString(@"设备号 (UDID)", nil), nil), nil), @"value": self.deviceUDID ?: @""}];
 
     [_rows addObject:@{
-        @"label": @"设备名称",
+        @"label": NSLocalizedString(NSLocalizedString(@"设备名称", nil), nil),
         @"value": [self plistDictString:allValues key:"DeviceName"] ?: @"—"
     }];
 
     [_rows addObject:@{
-        @"label": @"设备型号",
+        @"label": NSLocalizedString(NSLocalizedString(@"设备型号", nil), nil),
         @"value": [self plistDictString:allValues key:"ProductType"] ?: @"—"
     }];
 
     // Try DeviceClass as fallback for model
     NSString *deviceClass = [self plistDictString:allValues key:"DeviceClass"];
     if (deviceClass) {
-        [_rows addObject:@{@"label": @"设备类型", @"value": deviceClass}];
+        [_rows addObject:@{@"label": NSLocalizedString(NSLocalizedString(@"设备类型", nil), nil), @"value": deviceClass}];
     }
 
     // ProductVersion + BuildVersion
@@ -212,18 +212,18 @@
         NSString *buildStr = [self plistDictString:allValues key:"BuildVersion"];
         NSString *osInfo = [NSString stringWithFormat:@"iOS %@%@",
                             verStr ?: @"?", buildStr ? [NSString stringWithFormat:@" (%@)", buildStr] : @""];
-        [_rows addObject:@{@"label": @"操作系统与版本", @"value": osInfo}];
+        [_rows addObject:@{@"label": NSLocalizedString(NSLocalizedString(@"操作系统与版本", nil), nil), @"value": osInfo}];
     }
 
     // Additional useful info
     NSString *serialNum = [self plistDictString:allValues key:"SerialNumber"];
     if (serialNum) {
-        [_rows addObject:@{@"label": @"序列号", @"value": serialNum}];
+        [_rows addObject:@{@"label": NSLocalizedString(@"序列号", nil), @"value": serialNum}];
     }
 
     NSString *wifiAddr = [self plistDictString:allValues key:"WiFiAddress"];
     if (wifiAddr) {
-        [_rows addObject:@{@"label": @"WiFi 地址", @"value": wifiAddr}];
+        [_rows addObject:@{@"label": NSLocalizedString(@"WiFi 地址", nil), @"value": wifiAddr}];
     }
 
     if (allValues) plist_free(allValues);
@@ -301,12 +301,12 @@
 
     NSLog(@"[DeviceInfo] Found simulator: %@", foundDevice[@"name"]);
 
-    [_rows addObject:@{@"label": @"设备号 (UDID)", @"value": udid}];
-    [_rows addObject:@{@"label": @"设备名称", @"value": foundDevice[@"name"] ?: @"—"}];
-    [_rows addObject:@{@"label": @"设备型号", @"value": foundDevice[@"deviceTypeIdentifier"] ?: @"—"}];
+    [_rows addObject:@{@"label": NSLocalizedString(NSLocalizedString(NSLocalizedString(@"设备号 (UDID)", nil), nil), nil), @"value": udid}];
+    [_rows addObject:@{@"label": NSLocalizedString(NSLocalizedString(@"设备名称", nil), nil), @"value": foundDevice[@"name"] ?: @"—"}];
+    [_rows addObject:@{@"label": NSLocalizedString(NSLocalizedString(@"设备型号", nil), nil), @"value": foundDevice[@"deviceTypeIdentifier"] ?: @"—"}];
 
     // Parse runtime: "com.apple.CoreSimulator.SimRuntime.iOS-18-0" → "iOS 18.0"
-    NSString *osVer = @"模拟器";
+    NSString *osVer = NSLocalizedString(@"模拟器", nil);
     if (foundRuntime) {
         NSArray *parts = [foundRuntime componentsSeparatedByString:@"."];
         NSString *last = parts.lastObject;
@@ -314,11 +314,11 @@
             osVer = [[last stringByReplacingOccurrencesOfString:@"-" withString:@" "] stringByReplacingOccurrencesOfString:@"iOS" withString:@"iOS "];
         }
     }
-    [_rows addObject:@{@"label": @"操作系统与版本", @"value": osVer}];
+    [_rows addObject:@{@"label": NSLocalizedString(NSLocalizedString(@"操作系统与版本", nil), nil), @"value": osVer}];
 
     NSString *state = foundDevice[@"state"];
     if (state) {
-        [_rows addObject:@{@"label": @"状态", @"value": state}];
+        [_rows addObject:@{@"label": NSLocalizedString(@"状态", nil), @"value": state}];
     }
 }
 

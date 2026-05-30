@@ -31,7 +31,7 @@
 + (BOOL)requiresApp      { return NO; }
 
 - (instancetype)init {
-    return [super initWithFeatureName:@"应用列表"];
+    return [super initWithFeatureName:NSLocalizedString(@"应用列表", nil)];
 }
 
 #pragma mark - View Lifecycle
@@ -53,7 +53,7 @@
     _statusLabel.backgroundColor = [NSColor clearColor];
     _statusLabel.textColor = [NSColor secondaryLabelColor];
     _statusLabel.font = [NSFont systemFontOfSize:12];
-    _statusLabel.stringValue = @"正在加载应用列表…";
+    _statusLabel.stringValue = NSLocalizedString(@"正在加载应用列表…", nil);
     _statusLabel.translatesAutoresizingMaskIntoConstraints = NO;
     [self.view addSubview:_statusLabel];
 
@@ -78,7 +78,7 @@
     _tableView.rowSizeStyle = NSTableViewRowSizeStyleCustom;
 
     NSTableColumn *nameCol = [[NSTableColumn alloc] initWithIdentifier:@"name"];
-    nameCol.title = @"应用名称";
+    nameCol.title = NSLocalizedString(@"应用名称", nil);
     nameCol.width = 200;
     nameCol.minWidth = 140;
     nameCol.resizingMask = NSTableColumnUserResizingMask;
@@ -91,7 +91,7 @@
     [_tableView addTableColumn:bidCol];
 
     NSTableColumn *verCol = [[NSTableColumn alloc] initWithIdentifier:@"version"];
-    verCol.title = @"版本";
+    verCol.title = NSLocalizedString(@"版本", nil);
     verCol.width = 80;
     verCol.minWidth = 60;
     verCol.resizingMask = NSTableColumnUserResizingMask;
@@ -124,9 +124,9 @@
             [_spinner stopAnimation:nil];
             [_tableView reloadData];
             if (_rows.count == 0) {
-                _statusLabel.stringValue = @"未获取到应用或设备未连接";
+                _statusLabel.stringValue = NSLocalizedString(@"未获取到应用或设备未连接", nil);
             } else {
-                _statusLabel.stringValue = [NSString stringWithFormat:@"共 %lu 个应用", (unsigned long)_rows.count];
+                _statusLabel.stringValue = [NSString stringWithFormat:NSLocalizedString(@"共 %lu 个应用", nil), (unsigned long)_rows.count];
             }
         });
     });
@@ -149,7 +149,7 @@
     if (idevice_new_with_options(&device, cudid, IDEVICE_LOOKUP_USBMUX) != IDEVICE_E_SUCCESS) {
         NSLog(@"[AppList] idevice_new failed");
         dispatch_async(dispatch_get_main_queue(), ^{
-            _statusLabel.stringValue = @"无法连接设备";
+            _statusLabel.stringValue = NSLocalizedString(@"无法连接设备", nil);
         });
         return;
     }
@@ -158,7 +158,7 @@
     if (lockdownd_client_new_with_handshake(device, &lockdown, "MyUltron") != LOCKDOWN_E_SUCCESS) {
         idevice_free(device);
         dispatch_async(dispatch_get_main_queue(), ^{
-            _statusLabel.stringValue = @"Lockdown 握手失败";
+            _statusLabel.stringValue = NSLocalizedString(@"Lockdown 握手失败", nil);
         });
         return;
     }

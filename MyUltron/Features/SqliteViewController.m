@@ -60,12 +60,12 @@
     CGFloat y = self.view.bounds.size.height - 36;
 
     _dbSelector = [[NSPopUpButton alloc] initWithFrame:NSMakeRect(8, y, 200, 24)];
-    [_dbSelector addItemWithTitle:@"选择数据库…"]; _dbSelector.target = self; _dbSelector.action = @selector(dbChanged:);
+    [_dbSelector addItemWithTitle:NSLocalizedString(NSLocalizedString(@"选择数据库…", nil), nil)]; _dbSelector.target = self; _dbSelector.action = @selector(dbChanged:);
     _dbSelector.autoresizingMask = NSViewMaxXMargin | NSViewMinYMargin;
     [self.view addSubview:_dbSelector];
 
     _tableSelector = [[NSPopUpButton alloc] initWithFrame:NSMakeRect(216, y, 180, 24)];
-    [_tableSelector addItemWithTitle:@"选择表…"]; _tableSelector.target = self; _tableSelector.action = @selector(tableChanged:);
+    [_tableSelector addItemWithTitle:NSLocalizedString(NSLocalizedString(@"选择表…", nil), nil)]; _tableSelector.target = self; _tableSelector.action = @selector(tableChanged:);
     _tableSelector.autoresizingMask = NSViewMaxXMargin | NSViewMinYMargin;
     [self.view addSubview:_tableSelector];
 
@@ -91,7 +91,7 @@
     _statusLabel.editable = NO; _statusLabel.bordered = NO; _statusLabel.drawsBackground = NO;
     _statusLabel.textColor = [NSColor secondaryLabelColor];
     _statusLabel.font = [NSFont systemFontOfSize:11];
-    _statusLabel.stringValue = @"请先连接设备并选择数据库";
+    _statusLabel.stringValue = NSLocalizedString(@"请先连接设备并选择数据库", nil);
     _statusLabel.autoresizingMask = NSViewMaxXMargin | NSViewMaxYMargin;
     [self.view addSubview:_statusLabel];
 
@@ -118,7 +118,7 @@
 }
 
 - (void)sendListDBs {
-    _statusLabel.stringValue = @"正在加载数据库列表…";
+    _statusLabel.stringValue = NSLocalizedString(@"正在加载数据库列表…", nil);
     [self sendMessage:@{@"messageType": @"sqliteListDBs", @"version": @"1.0", @"content": @{}}];
 }
 
@@ -152,7 +152,7 @@
 - (void)handleDBList:(NSDictionary *)content {
     NSArray *dbs = content[@"databases"];
     [_dbSelector removeAllItems];
-    [_dbSelector addItemWithTitle:@"选择数据库…"];
+    [_dbSelector addItemWithTitle:NSLocalizedString(NSLocalizedString(@"选择数据库…", nil), nil)];
     if ([dbs isKindOfClass:[NSArray class]]) {
         for (NSDictionary *db in dbs) {
             NSString *name = db[@"name"];
@@ -161,13 +161,13 @@
             _dbSelector.lastItem.representedObject = name;
         }
     }
-    _statusLabel.stringValue = dbs.count > 0 ? [NSString stringWithFormat:@"共 %lu 个数据库", (unsigned long)dbs.count] : @"无数据库文件";
+    _statusLabel.stringValue = dbs.count > 0 ? [NSString stringWithFormat:NSLocalizedString(@"共 %lu 个数据库", nil), (unsigned long)dbs.count] : NSLocalizedString(@"无数据库文件", nil);
 }
 
 - (void)handleTables:(NSDictionary *)content {
     NSArray *tables = content[@"tables"];
     [_tableSelector removeAllItems];
-    [_tableSelector addItemWithTitle:@"选择表…"];
+    [_tableSelector addItemWithTitle:NSLocalizedString(NSLocalizedString(@"选择表…", nil), nil)];
     self.selectedTable = nil;
     if ([tables isKindOfClass:[NSArray class]]) {
         for (NSDictionary *t in tables) {
@@ -195,10 +195,10 @@
 - (void)handleExecuteResult:(NSDictionary *)content {
     BOOL ok = [content[@"success"] boolValue];
     if (ok) {
-        _statusLabel.stringValue = @"操作成功";
+        _statusLabel.stringValue = NSLocalizedString(@"操作成功", nil);
         [self sendQuery]; // refresh
     } else {
-        _statusLabel.stringValue = [NSString stringWithFormat:@"错误: %@", content[@"error"] ?: @"未知"];
+        _statusLabel.stringValue = [NSString stringWithFormat:NSLocalizedString(@"错误: %@", nil), content[@"error"] ?: @"未知"];
     }
 }
 
@@ -270,7 +270,7 @@
     // Use id column (column 0) as the row identifier for UPDATE
     id rowId = rowData.firstObject;
     if ([rowId isKindOfClass:[NSNull class]] || !rowId) {
-        _statusLabel.stringValue = @"无法获取行标识";
+        _statusLabel.stringValue = NSLocalizedString(NSLocalizedString(@"无法获取行标识", nil), nil);
         return;
     }
 
@@ -320,15 +320,15 @@
         }
     }
     if (insertCols.count == 0) {
-        _statusLabel.stringValue = @"该表无可插入字段";
+        _statusLabel.stringValue = NSLocalizedString(@"该表无可插入字段", nil);
         return;
     }
 
     NSAlert *alert = [[NSAlert alloc] init];
-    alert.messageText = @"新增数据行";
-    alert.informativeText = [NSString stringWithFormat:@"表: %@", _selectedTable];
-    [alert addButtonWithTitle:@"保存"];
-    [alert addButtonWithTitle:@"取消"];
+    alert.messageText = NSLocalizedString(@"新增数据行", nil);
+    alert.informativeText = [NSString stringWithFormat:NSLocalizedString(@"表: %@", nil), _selectedTable];
+    [alert addButtonWithTitle:NSLocalizedString(@"保存", nil)];
+    [alert addButtonWithTitle:NSLocalizedString(NSLocalizedString(@"取消", nil), nil)];
 
     NSView *form = [[NSView alloc] initWithFrame:NSMakeRect(0, 0, 300, insertCols.count * 30 + 10)];
     NSMutableArray<NSTextField *> *fields = [NSMutableArray array];
@@ -340,7 +340,7 @@
         [form addSubview:label];
 
         NSTextField *field = [[NSTextField alloc] initWithFrame:NSMakeRect(88, i * 30 + 2, 200, 24)];
-        field.placeholderString = [NSString stringWithFormat:@"输入 %@ …", insertCols[i]];
+        field.placeholderString = [NSString stringWithFormat:NSLocalizedString(@"输入 %@ …", nil), insertCols[i]];
         [form addSubview:field];
         [fields addObject:field];
     }
@@ -367,10 +367,10 @@
     if (row < 0 || !_selectedTable) return;
 
     NSAlert *alert = [[NSAlert alloc] init];
-    alert.messageText = @"确认删除";
-    alert.informativeText = [NSString stringWithFormat:@"删除表 \"%@\" 中第 %ld 行数据？此操作不可撤销。", _selectedTable, (long)row + 1];
-    [alert addButtonWithTitle:@"删除"];
-    [alert addButtonWithTitle:@"取消"];
+    alert.messageText = NSLocalizedString(@"确认删除", nil);
+    alert.informativeText = [NSString stringWithFormat:NSLocalizedString(NSLocalizedString(@"删除表 \"%@\" 中第 %ld 行数据？此操作不可撤销。", nil), nil), _selectedTable, (long)row + 1];
+    [alert addButtonWithTitle:NSLocalizedString(@"删除", nil)];
+    [alert addButtonWithTitle:NSLocalizedString(NSLocalizedString(@"取消", nil), nil)];
     alert.alertStyle = NSAlertStyleWarning;
 
     [alert beginSheetModalForWindow:self.view.window completionHandler:^(NSModalResponse code) {
@@ -378,7 +378,7 @@
         // Use id column (column 0) as the row identifier for DELETE
         id rowId = _rows[row].firstObject;
         if ([rowId isKindOfClass:[NSNull class]] || !rowId) {
-            _statusLabel.stringValue = @"无法获取行标识";
+            _statusLabel.stringValue = NSLocalizedString(NSLocalizedString(@"无法获取行标识", nil), nil);
             return;
         }
         NSString *sql = [NSString stringWithFormat:@"DELETE FROM \"%@\" WHERE %@ = %@", _selectedTable, _columns[0], rowId];

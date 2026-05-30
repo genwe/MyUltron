@@ -8,7 +8,7 @@
 @implementation HotfixViewController
 
 - (instancetype)init {
-    return [super initWithFeatureName:@"热修复"];
+    return [super initWithFeatureName:NSLocalizedString(@"热修复", nil)];
 }
 
 @end

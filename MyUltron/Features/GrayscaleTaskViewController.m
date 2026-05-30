@@ -8,7 +8,7 @@
 @implementation GrayscaleTaskViewController
 
 - (instancetype)init {
-    return [super initWithFeatureName:@"灰度任务"];
+    return [super initWithFeatureName:NSLocalizedString(@"灰度任务", nil)];
 }
 
 @end

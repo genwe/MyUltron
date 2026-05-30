@@ -123,12 +123,12 @@ static NSString * const kPrefFeatureConfig = @"MyUltronFeatureConfig";
 - (void)viewDidLoad {
     [super viewDidLoad];
 
-    self.deviceButton = [NSButton buttonWithTitle:@"连接设备" target:self action:@selector(showDeviceMenu:)];
+    self.deviceButton = [NSButton buttonWithTitle:NSLocalizedString(@"连接设备", nil) target:self action:@selector(showDeviceMenu:)];
     self.deviceButton.frame = NSMakeRect(16, self.view.bounds.size.height - 44, 140, 32);
     self.deviceButton.autoresizingMask = NSViewMaxXMargin | NSViewMinYMargin;
     [self.view addSubview:self.deviceButton];
 
-    self.appButton = [NSButton buttonWithTitle:@"选择App" target:self action:@selector(showAppMenu:)];
+    self.appButton = [NSButton buttonWithTitle:NSLocalizedString(@"选择App", nil) target:self action:@selector(showAppMenu:)];
     self.appButton.frame = NSMakeRect(164, self.view.bounds.size.height - 44, 140, 32);
     self.appButton.autoresizingMask = NSViewMaxXMargin | NSViewMinYMargin;
     [self.view addSubview:self.appButton];
@@ -155,7 +155,7 @@ static NSString * const kPrefFeatureConfig = @"MyUltronFeatureConfig";
     tableView.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
 
     NSTableColumn *column = [[NSTableColumn alloc] initWithIdentifier:@"feature"];
-    column.title = @"功能列表";
+    column.title = NSLocalizedString(@"功能列表", nil);
     column.width = scrollView.bounds.size.width;
     [tableView addTableColumn:column];
     tableView.headerView = nil;
@@ -218,25 +218,25 @@ static NSString * const kPrefFeatureConfig = @"MyUltronFeatureConfig";
 
 - (NSArray<NSDictionary *> *)defaultFeatureConfig {
     return @[
-        @{@"name": @"设备信息",      @"class": [DeviceInfoViewController class]},
-        @{@"name": @"应用列表",      @"class": [AppListViewController class]},
-        @{@"name": @"设备截屏",      @"class": [DeviceScreenshotViewController class]},
-        @{@"name": @"沙盒管理",      @"class": [SandboxViewController class]},
-        @{@"name": @"MMKV数据",      @"class": [MMKVViewController class]},
-        @{@"name": @"UserDefault数据",@"class": [UserDefaultsViewController class]},
-        @{@"name": @"SQLite浏览器",   @"class": [SqliteViewController class]},
-        @{@"name": @"编解码",        @"class": [CodecViewController class]},
-        @{@"name": @"消息推送",      @"class": [MessagePushViewController class]},
-        @{@"name": @"网络监控",      @"class": [NetworkMonitorViewController class]},
-        @{@"name": @"日志监控",      @"class": [LogMonitorViewController class]},
-        @{@"name": @"埋点监控",      @"class": [AnalyticsMonitorViewController class]},
-        @{@"name": @"IM会话监控",    @"class": [IMSessionViewController class]},
-        @{@"name": @"路由校验",      @"class": [RouteValidationViewController class]},
-        @{@"name": @"环境切换",      @"class": [EnvironmentSwitchViewController class]},
-        @{@"name": @"崩溃日志",      @"class": [CrashLogViewController class]},
-        @{@"name": @"热修复",        @"class": [HotfixViewController class]},
-        @{@"name": @"灰度任务",      @"class": [GrayscaleTaskViewController class]},
-        @{@"name": @"解析日志文件",   @"class": [XlogParserViewController class]},
+        @{@"name": NSLocalizedString(@"设备信息", nil),      @"class": [DeviceInfoViewController class]},
+        @{@"name": NSLocalizedString(@"应用列表", nil),      @"class": [AppListViewController class]},
+        @{@"name": NSLocalizedString(@"设备截屏", nil),      @"class": [DeviceScreenshotViewController class]},
+        @{@"name": NSLocalizedString(@"沙盒管理", nil),      @"class": [SandboxViewController class]},
+        @{@"name": NSLocalizedString(@"MMKV数据", nil),      @"class": [MMKVViewController class]},
+        @{@"name": NSLocalizedString(@"UserDefault数据", nil),@"class": [UserDefaultsViewController class]},
+        @{@"name": NSLocalizedString(@"SQLite浏览器", nil),   @"class": [SqliteViewController class]},
+        @{@"name": NSLocalizedString(@"编解码", nil),        @"class": [CodecViewController class]},
+        @{@"name": NSLocalizedString(@"消息推送", nil),      @"class": [MessagePushViewController class]},
+        @{@"name": NSLocalizedString(@"网络监控", nil),      @"class": [NetworkMonitorViewController class]},
+        @{@"name": NSLocalizedString(@"日志监控", nil),      @"class": [LogMonitorViewController class]},
+        @{@"name": NSLocalizedString(@"埋点监控", nil),      @"class": [AnalyticsMonitorViewController class]},
+        @{@"name": NSLocalizedString(@"IM会话监控", nil),    @"class": [IMSessionViewController class]},
+        @{@"name": NSLocalizedString(@"路由校验", nil),      @"class": [RouteValidationViewController class]},
+        @{@"name": NSLocalizedString(@"环境切换", nil),      @"class": [EnvironmentSwitchViewController class]},
+        @{@"name": NSLocalizedString(@"崩溃日志", nil),      @"class": [CrashLogViewController class]},
+        @{@"name": NSLocalizedString(@"热修复", nil),        @"class": [HotfixViewController class]},
+        @{@"name": NSLocalizedString(@"灰度任务", nil),      @"class": [GrayscaleTaskViewController class]},
+        @{@"name": NSLocalizedString(@"解析日志文件", nil),   @"class": [XlogParserViewController class]},
     ];
 }
 
@@ -281,6 +281,13 @@ static NSString * const kPrefFeatureConfig = @"MyUltronFeatureConfig";
             [_featureConfig addObject:[NSMutableDictionary dictionaryWithDictionary:d]];
             _featureConfig.lastObject[@"visible"] = @YES;
         }
+    }
+
+    // 无论从 defaults 加载还是用默认配置，name 都重新从 defaultFeatureConfig 取
+    // 这样 NSLocalizedString 每次都能根据当前语言正确解析
+    NSArray *defaults = [self defaultFeatureConfig];
+    for (NSUInteger i = 0; i < _featureConfig.count && i < defaults.count; i++) {
+        _featureConfig[i][@"name"] = defaults[i][@"name"];
     }
     [self rebuildFeatureArrays];
 }
@@ -328,7 +335,7 @@ static NSString * const kPrefFeatureConfig = @"MyUltronFeatureConfig";
     if (!self.deviceButton.enabled) return;
 
     NSString *origTitle = self.deviceButton.title;
-    self.deviceButton.title = @"扫描中…";
+    self.deviceButton.title = NSLocalizedString(@"扫描中…", nil);
     self.deviceButton.enabled = NO;
 
     NSLog(@"[MyUltron] Device scan started…");
@@ -343,7 +350,7 @@ static NSString * const kPrefFeatureConfig = @"MyUltronFeatureConfig";
         self.deviceButton.enabled = YES;
         NSLog(@"[MyUltron] Device scan TIMEOUT — showing fallback menu");
         NSMenu *menu = [[NSMenu alloc] init];
-        [menu addItemWithTitle:@"设备扫描超时，请重试" action:nil keyEquivalent:@""];
+        [menu addItemWithTitle:NSLocalizedString(@"设备扫描超时，请重试", nil) action:nil keyEquivalent:@""];
         [menu popUpMenuPositioningItem:nil atLocation:NSMakePoint(0, sender.bounds.size.height) inView:sender];
     });
 
@@ -408,7 +415,7 @@ static NSString * const kPrefFeatureConfig = @"MyUltronFeatureConfig";
             }
 
             if (menu.numberOfItems == 0) {
-                [menu addItemWithTitle:@"未检测到设备" action:nil keyEquivalent:@""];
+                [menu addItemWithTitle:NSLocalizedString(@"未检测到设备", nil) action:nil keyEquivalent:@""];
             }
 
             [menu popUpMenuPositioningItem:nil atLocation:NSMakePoint(0, sender.bounds.size.height) inView:sender];
@@ -421,14 +428,14 @@ static NSString * const kPrefFeatureConfig = @"MyUltronFeatureConfig";
     self.deviceButton.title = info[@"name"];
     self.selectedUDID = info[@"udid"];
     self.selectedIsSimulator = [info[@"simulator"] boolValue];
-    self.appButton.title = @"请选择应用";
+    self.appButton.title = NSLocalizedString(NSLocalizedString(NSLocalizedString(@"请选择应用", nil), nil), nil);
     self.selectedAppBundleID = nil;
 }
 
 - (void)showAppMenu:(NSButton *)sender {
     if (!self.selectedUDID) {
         NSAlert *alert = [[NSAlert alloc] init];
-        alert.messageText = @"请先选择设备";
+        alert.messageText = NSLocalizedString(@"请先选择设备", nil);
         [alert runModal];
         return;
     }
@@ -437,7 +444,7 @@ static NSString * const kPrefFeatureConfig = @"MyUltronFeatureConfig";
     if (!self.appButton.enabled) return;
 
     NSString *origTitle = self.appButton.title;
-    self.appButton.title = @"加载中…";
+    self.appButton.title = NSLocalizedString(@"加载中…", nil);
     self.appButton.enabled = NO;
 
     NSLog(@"[MyUltron] App scan started for %@…", self.selectedIsSimulator ? @"simulator" : @"device");
@@ -452,7 +459,7 @@ static NSString * const kPrefFeatureConfig = @"MyUltronFeatureConfig";
         self.appButton.enabled = YES;
         NSLog(@"[MyUltron] App scan TIMEOUT");
         NSMenu *menu = [[NSMenu alloc] init];
-        [menu addItemWithTitle:@"应用扫描超时，请重试" action:nil keyEquivalent:@""];
+        [menu addItemWithTitle:NSLocalizedString(@"应用扫描超时，请重试", nil) action:nil keyEquivalent:@""];
         [menu popUpMenuPositioningItem:nil atLocation:NSMakePoint(0, sender.bounds.size.height) inView:sender];
     });
 
@@ -477,7 +484,7 @@ static NSString * const kPrefFeatureConfig = @"MyUltronFeatureConfig";
             }
 
             if (menu.numberOfItems == 0) {
-                [menu addItemWithTitle:@"未找到App" action:nil keyEquivalent:@""];
+                [menu addItemWithTitle:NSLocalizedString(@"未找到App", nil) action:nil keyEquivalent:@""];
             }
 
             [menu popUpMenuPositioningItem:nil atLocation:NSMakePoint(0, sender.bounds.size.height) inView:sender];
@@ -724,14 +731,14 @@ static NSString * const kPrefFeatureConfig = @"MyUltronFeatureConfig";
 #pragma mark - MyUltronClientDelegate
 
 - (void)clientDidConnect:(MyUltronClient *)client {
-    [self showToast:@"已连接到 App"];
+    [self showToast:NSLocalizedString(@"已连接到 App", nil)];
     if ([self.currentFeatureVC respondsToSelector:@selector(viewDidConnect)]) {
         [self.currentFeatureVC viewDidConnect];
     }
 }
 
 - (void)clientDidDisconnect:(MyUltronClient *)client {
-    [self showToast:@"连接已断开"];
+    [self showToast:NSLocalizedString(@"连接已断开", nil)];
     if ([self.currentFeatureVC respondsToSelector:@selector(viewDidDisconnect)]) {
         [self.currentFeatureVC viewDidDisconnect];
     }
@@ -791,11 +798,11 @@ static NSString * const kPrefFeatureConfig = @"MyUltronFeatureConfig";
     NSArray *classes = [self featureClasses];
     Class cls = classes[row];
     if ([cls requiresConnection] && !self.selectedUDID) {
-        [self showToast:@"请选择连接设备"];
+        [self showToast:NSLocalizedString(@"请选择连接设备", nil)];
         return;
     }
-    if ([cls requiresApp] && [self.appButton.title isEqualToString:@"请选择应用"]) {
-        [self showToast:@"请选择应用"];
+    if ([cls requiresApp] && [self.appButton.title isEqualToString:NSLocalizedString(NSLocalizedString(NSLocalizedString(@"请选择应用", nil), nil), nil)]) {
+        [self showToast:NSLocalizedString(NSLocalizedString(NSLocalizedString(@"请选择应用", nil), nil), nil)];
         return;
     }
 
@@ -862,10 +869,10 @@ static NSString * const kPrefFeatureConfig = @"MyUltronFeatureConfig";
     _settingsEditConfig = editConfig;
 
     NSAlert *alert = [[NSAlert alloc] init];
-    alert.messageText = @"功能列表设置";
-    alert.informativeText = @"☑ 勾选控制侧边栏可见";
-    [alert addButtonWithTitle:@"保存"];
-    [alert addButtonWithTitle:@"取消"];
+    alert.messageText = NSLocalizedString(@"功能列表设置", nil);
+    alert.informativeText = NSLocalizedString(@"☑ 勾选控制侧边栏可见", nil);
+    [alert addButtonWithTitle:NSLocalizedString(@"保存", nil)];
+    [alert addButtonWithTitle:NSLocalizedString(@"取消", nil)];
     alert.accessoryView = sv;
 
     [alert beginSheetModalForWindow:self.view.window completionHandler:^(NSModalResponse code) {
@@ -1091,14 +1098,14 @@ static NSString * const kPrefFeatureConfig = @"MyUltronFeatureConfig";
 
 - (void)installAppAtPath:(NSString *)path {
     if (!self.selectedUDID) {
-        [self showToast:@"请先选择设备后再拖拽安装"];
+        [self showToast:NSLocalizedString(@"请先选择设备后再拖拽安装", nil)];
         return;
     }
 
     NSString *fileName = path.lastPathComponent;
     NSLog(@"[MyUltron] Installing: %@ → device: %@", fileName, self.selectedUDID);
 
-    [self showToast:[NSString stringWithFormat:@"正在安装 %@ ...", fileName]];
+    [self showToast:[NSString stringWithFormat:NSLocalizedString(@"正在安装 %@ ...", nil), fileName]];
 
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
         BOOL success = NO;
@@ -1112,10 +1119,10 @@ static NSString * const kPrefFeatureConfig = @"MyUltronFeatureConfig";
 
         dispatch_async(dispatch_get_main_queue(), ^{
             if (success) {
-                [self showToast:[NSString stringWithFormat:@"%@ 安装成功", fileName]];
+                [self showToast:[NSString stringWithFormat:NSLocalizedString(@"%@ 安装成功", nil), fileName]];
                 NSLog(@"[Install] SUCCESS: %@ on device %@", fileName, self.selectedUDID);
             } else {
-                [self showToast:[NSString stringWithFormat:@"安装失败: %@", errorMsg ?: @"未知错误"]];
+                [self showToast:[NSString stringWithFormat:NSLocalizedString(@"安装失败: %@", nil), errorMsg ?: NSLocalizedString(@"未知错误", nil)]];
                 NSLog(@"[Install] FAILED: %@ — %@ (device: %@)", fileName, errorMsg, self.selectedUDID);
             }
         });
@@ -1148,14 +1155,14 @@ static NSString * const kPrefFeatureConfig = @"MyUltronFeatureConfig";
 - (BOOL)installToDevice:(NSString *)localPath error:(NSString **)error {
     BOOL isDirectory = NO;
     if (![[NSFileManager defaultManager] fileExistsAtPath:localPath isDirectory:&isDirectory]) {
-        if (error) *error = @"文件不存在";
+        if (error) *error = NSLocalizedString(@"文件不存在", nil);
         return NO;
     }
 
     // 1. Connect to device
     idevice_t device = NULL;
     if (idevice_new_with_options(&device, self.selectedUDID.UTF8String, IDEVICE_LOOKUP_USBMUX) != IDEVICE_E_SUCCESS) {
-        if (error) *error = @"无法连接设备";
+        if (error) *error = NSLocalizedString(@"无法连接设备", nil);
         return NO;
     }
 
@@ -1163,7 +1170,7 @@ static NSString * const kPrefFeatureConfig = @"MyUltronFeatureConfig";
     lockdownd_client_t lockdown = NULL;
     if (lockdownd_client_new_with_handshake(device, &lockdown, "MyUltron") != LOCKDOWN_E_SUCCESS) {
         idevice_free(device);
-        if (error) *error = @"lockdown handshake 失败";
+        if (error) *error = NSLocalizedString(@"lockdown handshake 失败", nil);
         return NO;
     }
 
@@ -1201,13 +1208,13 @@ static NSString * const kPrefFeatureConfig = @"MyUltronFeatureConfig";
     afc_client_t afc = NULL;
 
     if (lockdownd_start_service(lockdown, AFC_SERVICE_NAME, &svc) != LOCKDOWN_E_SUCCESS || !svc) {
-        if (error) *error = @"无法启动 AFC 服务";
+        if (error) *error = NSLocalizedString(@"无法启动 AFC 服务", nil);
         return NO;
     }
 
     if (afc_client_new(device, svc, &afc) != AFC_E_SUCCESS) {
         lockdownd_service_descriptor_free(svc);
-        if (error) *error = @"无法创建 AFC 客户端";
+        if (error) *error = NSLocalizedString(@"无法创建 AFC 客户端", nil);
         return NO;
     }
     lockdownd_service_descriptor_free(svc);
@@ -1234,13 +1241,13 @@ static NSString * const kPrefFeatureConfig = @"MyUltronFeatureConfig";
 {
     NSData *fileData = [NSData dataWithContentsOfFile:localPath];
     if (!fileData) {
-        if (error) *error = @"无法读取本地文件";
+        if (error) *error = NSLocalizedString(@"无法读取本地文件", nil);
         return NO;
     }
 
     uint64_t handle = 0;
     if (afc_file_open(afc, remotePath.UTF8String, AFC_FOPEN_WRONLY, &handle) != AFC_E_SUCCESS) {
-        if (error) *error = [NSString stringWithFormat:@"无法在设备上创建文件: %@", remotePath.lastPathComponent];
+        if (error) *error = [NSString stringWithFormat:NSLocalizedString(@"无法在设备上创建文件: %@", nil), remotePath.lastPathComponent];
         return NO;
     }
 
@@ -1253,7 +1260,7 @@ static NSString * const kPrefFeatureConfig = @"MyUltronFeatureConfig";
         uint32_t written = 0;
         if (afc_file_write(afc, handle, bytes + offset, chunk, &written) != AFC_E_SUCCESS || written == 0) {
             afc_file_close(afc, handle);
-            if (error) *error = @"写入设备文件失败";
+            if (error) *error = NSLocalizedString(@"写入设备文件失败", nil);
             return NO;
         }
         offset += written;
@@ -1270,14 +1277,14 @@ static NSString * const kPrefFeatureConfig = @"MyUltronFeatureConfig";
 {
     // Create the .app directory on device
     if (afc_make_directory(afc, remotePath.UTF8String) != AFC_E_SUCCESS) {
-        if (error) *error = [NSString stringWithFormat:@"无法创建设备目录: %@", remotePath.lastPathComponent];
+        if (error) *error = [NSString stringWithFormat:NSLocalizedString(@"无法创建设备目录: %@", nil), remotePath.lastPathComponent];
         return NO;
     }
 
     NSFileManager *fm = [NSFileManager defaultManager];
     NSArray<NSString *> *contents = [fm contentsOfDirectoryAtPath:localDir error:nil];
     if (!contents) {
-        if (error) *error = @"无法读取 .app 目录内容";
+        if (error) *error = NSLocalizedString(@"无法读取 .app 目录内容", nil);
         return NO;
     }
 
@@ -1365,13 +1372,13 @@ static void instproxy_status_callback(plist_t command, plist_t status, void *use
     instproxy_client_t ip = NULL;
 
     if (lockdownd_start_service(lockdown, INSTPROXY_SERVICE_NAME, &svc) != LOCKDOWN_E_SUCCESS || !svc) {
-        if (error) *error = @"无法启动 installation_proxy 服务";
+        if (error) *error = NSLocalizedString(@"无法启动 installation_proxy 服务", nil);
         return NO;
     }
 
     if (instproxy_client_new(device, svc, &ip) != INSTPROXY_E_SUCCESS) {
         lockdownd_service_descriptor_free(svc);
-        if (error) *error = @"无法创建 installation_proxy 客户端";
+        if (error) *error = NSLocalizedString(@"无法创建 installation_proxy 客户端", nil);
         return NO;
     }
     lockdownd_service_descriptor_free(svc);
@@ -1387,7 +1394,7 @@ static void instproxy_status_callback(plist_t command, plist_t status, void *use
     instproxy_error_t ret = instproxy_install(ip, remotePath.UTF8String, opts,
                                                instproxy_status_callback, &ctx);
     if (ret != INSTPROXY_E_SUCCESS) {
-        if (error) *error = [NSString stringWithFormat:@"安装请求失败 (code %d)", ret];
+        if (error) *error = [NSString stringWithFormat:NSLocalizedString(@"安装请求失败 (code %d)", nil), ret];
         if (opts) instproxy_client_options_free(opts);
         instproxy_client_free(ip);
         return NO;
@@ -1401,7 +1408,7 @@ static void instproxy_status_callback(plist_t command, plist_t status, void *use
 
     BOOL success = ctx.done && !ctx.errMsg;
     if (!success && error) {
-        *error = ctx.errMsg ?: @"安装超时或失败";
+        *error = ctx.errMsg ?: NSLocalizedString(@"安装超时或失败", nil);
     }
     if (opts) instproxy_client_options_free(opts);
     instproxy_client_free(ip);

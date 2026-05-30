@@ -61,7 +61,7 @@ static NSString * const kMsgContent = @"content";
 + (BOOL)requiresApp { return YES; }
 
 - (instancetype)init {
-    self = [super initWithFeatureName:@"网络监控"];
+    self = [super initWithFeatureName:NSLocalizedString(@"网络监控", nil)];
     if (self) {
         _entries = [NSMutableArray array];
         _mockRules = [NSMutableArray array];
@@ -199,13 +199,13 @@ static NSString * const kMsgContent = @"content";
 - (void)updateStatusForConnection {
     dispatch_async(dispatch_get_main_queue(), ^{
         if (self.client.isConnected) {
-            self.statusLabel.stringValue = [NSString stringWithFormat:@"已连接 | %lu 请求 | %lu Mock",
+            self.statusLabel.stringValue = [NSString stringWithFormat:NSLocalizedString(@"已连接 | %lu 请求 | %lu Mock", nil),
                                             (unsigned long)self.entries.count, (unsigned long)self.mockRules.count];
             self.toggleButton.enabled = YES;
             self.clearButton.enabled = YES;
             self.mockListButton.enabled = YES;
         } else {
-            self.statusLabel.stringValue = @"未连接";
+            self.statusLabel.stringValue = NSLocalizedString(@"未连接", nil);
             self.toggleButton.enabled = NO;
             self.clearButton.enabled = NO;
             self.mockListButton.enabled = NO;
@@ -216,17 +216,17 @@ static NSString * const kMsgContent = @"content";
 #pragma mark - UI
 
 - (void)setupUI {
-    _toggleButton = [NSButton buttonWithTitle:@"⏸ 停止" target:self action:@selector(toggleMonitor:)];
+    _toggleButton = [NSButton buttonWithTitle:NSLocalizedString(NSLocalizedString(@"⏸ 停止", nil), nil) target:self action:@selector(toggleMonitor:)];
     _toggleButton.bezelStyle = NSBezelStyleRounded;
     _toggleButton.translatesAutoresizingMaskIntoConstraints = NO;
     [self.view addSubview:_toggleButton];
 
-    _clearButton = [NSButton buttonWithTitle:@"清空" target:self action:@selector(clearEntries:)];
+    _clearButton = [NSButton buttonWithTitle:NSLocalizedString(@"清空", nil) target:self action:@selector(clearEntries:)];
     _clearButton.bezelStyle = NSBezelStyleRounded;
     _clearButton.translatesAutoresizingMaskIntoConstraints = NO;
     [self.view addSubview:_clearButton];
 
-    _mockListButton = [NSButton buttonWithTitle:@"Mock 规则" target:self action:@selector(showMockListWindow:)];
+    _mockListButton = [NSButton buttonWithTitle:NSLocalizedString(@"Mock 规则", nil) target:self action:@selector(showMockListWindow:)];
     _mockListButton.bezelStyle = NSBezelStyleRounded;
     _mockListButton.translatesAutoresizingMaskIntoConstraints = NO;
     [self.view addSubview:_mockListButton];
@@ -236,7 +236,7 @@ static NSString * const kMsgContent = @"content";
     _statusLabel.backgroundColor = [NSColor clearColor];
     _statusLabel.textColor = [NSColor secondaryLabelColor];
     _statusLabel.font = [NSFont systemFontOfSize:11];
-    _statusLabel.stringValue = @"正在检测连接…";
+    _statusLabel.stringValue = NSLocalizedString(@"正在检测连接…", nil);
     _statusLabel.translatesAutoresizingMaskIntoConstraints = NO;
     [self.view addSubview:_statusLabel];
 
@@ -268,14 +268,14 @@ static NSString * const kMsgContent = @"content";
 
     // ---- 详情 ----
     _detailLabel = [[NSTextField alloc] initWithFrame:NSZeroRect];
-    _detailLabel.stringValue = @"请求详情：";
+    _detailLabel.stringValue = NSLocalizedString(@"请求详情：", nil);
     _detailLabel.editable = NO; _detailLabel.bordered = NO; _detailLabel.selectable = NO;
     _detailLabel.backgroundColor = [NSColor clearColor];
     _detailLabel.font = [NSFont boldSystemFontOfSize:11];
     _detailLabel.translatesAutoresizingMaskIntoConstraints = NO;
     [self.view addSubview:_detailLabel];
 
-    _detailSegment = [NSSegmentedControl segmentedControlWithLabels:@[@"请求头",@"请求体",@"响应头",@"响应体"]
+    _detailSegment = [NSSegmentedControl segmentedControlWithLabels:@[NSLocalizedString(@"请求头", nil),NSLocalizedString(@"请求体", nil),NSLocalizedString(@"响应头", nil),NSLocalizedString(@"响应体", nil)]
                                                        trackingMode:NSSegmentSwitchTrackingSelectOne
                                                              target:self action:@selector(detailCategoryChanged:)];
     _detailSegment.selectedSegment = 0;
@@ -348,7 +348,7 @@ static NSString * const kMsgContent = @"content";
         _mockListTable.usesAlternatingRowBackgroundColors = YES;
 
         NSArray *mockCols = @[
-            @{@"id": @"ml_name",    @"title": @"名称",    @"width": @130},
+            @{@"id": @"ml_name",    @"title": NSLocalizedString(@"名称", nil),    @"width": @130},
             @{@"id": @"ml_url",     @"title": @"URL",     @"width": @240},
             @{@"id": @"ml_status",  @"title": @"Status",  @"width": @55},
             @{@"id": @"ml_on",      @"title": @"On",      @"width": @35},
@@ -360,9 +360,9 @@ static NSString * const kMsgContent = @"content";
         }
 
         NSMenu *mockMenu = [[NSMenu alloc] init];
-        NSMenuItem *editItem = [[NSMenuItem alloc] initWithTitle:@"查看/修改" action:@selector(editMockFromListWindow:) keyEquivalent:@""];
+        NSMenuItem *editItem = [[NSMenuItem alloc] initWithTitle:NSLocalizedString(@"查看/修改", nil) action:@selector(editMockFromListWindow:) keyEquivalent:@""];
         editItem.target = self; [mockMenu addItem:editItem];
-        NSMenuItem *delItem = [[NSMenuItem alloc] initWithTitle:@"删除" action:@selector(deleteMockFromListWindow:) keyEquivalent:@""];
+        NSMenuItem *delItem = [[NSMenuItem alloc] initWithTitle:NSLocalizedString(@"删除", nil) action:@selector(deleteMockFromListWindow:) keyEquivalent:@""];
         delItem.target = self; [mockMenu addItem:delItem];
         _mockListTable.menu = mockMenu;
 
@@ -470,11 +470,11 @@ static NSString * const kMsgContent = @"content";
     CGFloat y = frame.size.height - 30;
 
     // 名称（必填）
-    NSTextField *nameLabel = [self labelWithString:@"名称 *:"];
+    NSTextField *nameLabel = [self labelWithString:NSLocalizedString(@"名称 *:", nil)];
     nameLabel.frame = NSMakeRect(16, y, 50, 18); [cv addSubview:nameLabel];
     _mockEditNameField = [[NSTextField alloc] initWithFrame:NSMakeRect(70, y-2, 434, 22)];
     _mockEditNameField.font = [NSFont systemFontOfSize:11];
-    _mockEditNameField.placeholderString = @"必填，同一URL可用不同名称区分";
+    _mockEditNameField.placeholderString = NSLocalizedString(@"必填，同一URL可用不同名称区分", nil);
     [cv addSubview:_mockEditNameField];
     y -= 28;
 
@@ -506,11 +506,11 @@ static NSString * const kMsgContent = @"content";
     sv.documentView = _mockEditBodyView;
     [cv addSubview:sv];
 
-    NSButton *saveBtn = [NSButton buttonWithTitle:@"保存" target:self action:@selector(saveMockRule:)];
+    NSButton *saveBtn = [NSButton buttonWithTitle:NSLocalizedString(@"保存", nil) target:self action:@selector(saveMockRule:)];
     saveBtn.bezelStyle = NSBezelStyleRounded; saveBtn.frame = NSMakeRect(430, 12, 74, 28);
     [cv addSubview:saveBtn];
 
-    NSButton *cancelBtn = [NSButton buttonWithTitle:@"取消" target:self action:@selector(cancelMockEdit:)];
+    NSButton *cancelBtn = [NSButton buttonWithTitle:NSLocalizedString(@"取消", nil) target:self action:@selector(cancelMockEdit:)];
     cancelBtn.bezelStyle = NSBezelStyleRounded; cancelBtn.frame = NSMakeRect(350, 12, 74, 28);
     [cv addSubview:cancelBtn];
 }
@@ -526,7 +526,7 @@ static NSString * const kMsgContent = @"content";
     NSString *name = _mockEditNameField.stringValue;
     if (name.length == 0) {
         NSAlert *alert = [[NSAlert alloc] init];
-        alert.messageText = @"名称不能为空";
+        alert.messageText = NSLocalizedString(@"名称不能为空", nil);
         [alert beginSheetModalForWindow:_mockEditSheet completionHandler:nil];
         return;
     }
@@ -564,7 +564,7 @@ static NSString * const kMsgContent = @"content";
 
 - (void)toggleMonitor:(NSButton *)sender {
     _isMonitoring = !_isMonitoring;
-    sender.title = _isMonitoring ? @"⏸ 停止" : @"▶ 开始";
+    sender.title = _isMonitoring ? NSLocalizedString(NSLocalizedString(@"⏸ 停止", nil), nil) : NSLocalizedString(@"▶ 开始", nil);
     [self sendMessage:@"networkMonitor" content:@{@"action": _isMonitoring ? @"start" : @"stop"}];
 }
 
