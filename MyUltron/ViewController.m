@@ -722,9 +722,9 @@ static NSString * const kPrefFeatureConfig = @"MyUltronFeatureConfig";
     self.serverPort = [AppDelegate serverPort];
 
     if (self.selectedIsSimulator) {
-        [self.client connectToHost:@"127.0.0.1" port:self.serverPort];
+        [self.client connectToHost:@"127.0.0.1" fromPort:self.serverPort toPort:self.serverPort + 100];
     } else {
-        [self.client connectToDeviceUDID:self.selectedUDID port:self.serverPort];
+        [self.client connectToDeviceUDID:self.selectedUDID fromPort:self.serverPort toPort:self.serverPort + 100];
     }
 }
 

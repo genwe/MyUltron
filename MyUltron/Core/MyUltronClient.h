@@ -50,6 +50,12 @@ NS_ASSUME_NONNULL_BEGIN
 /// Connect to MyUltronServer on an iOS device via usbmuxd (no external iproxy needed).
 - (void)connectToDeviceUDID:(NSString *)udid port:(uint16_t)port;
 
+/// Try a range of ports, connecting to the first available one.
+- (void)connectToHost:(NSString *)host fromPort:(uint16_t)fromPort toPort:(uint16_t)toPort;
+
+/// Try a range of ports via usbmuxd.
+- (void)connectToDeviceUDID:(NSString *)udid fromPort:(uint16_t)fromPort toPort:(uint16_t)toPort;
+
 /// Disconnect.
 - (void)disconnect;
 

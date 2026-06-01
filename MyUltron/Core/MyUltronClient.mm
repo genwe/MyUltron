@@ -155,6 +155,34 @@ static NSString * const kMsgKeyContent = @"content";
     });
 }
 
+- (void)connectToHost:(NSString *)host fromPort:(uint16_t)fromPort toPort:(uint16_t)toPort {
+    for (uint16_t p = fromPort; p <= toPort; p++) {
+        [self connectToHost:host port:p];
+        [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.3]];
+        if (self.isConnected) return;
+    }
+    NSLog(@"[MyUltron] Failed to connect to %@ on ports %u-%u", host, fromPort, toPort);
+}
+
+- (void)connectToDeviceUDID:(NSString *)udid fromPort:(uint16_t)fromPort toPort:(uint16_t)toPort {
+    __block uint16_t current = fromPort;
+    __block void (^tryNext)(void);
+    tryNext = ^{
+        if (current > toPort) {
+            NSLog(@"[MyUltron] Failed to connect to device on ports %u-%u", fromPort, toPort);
+            return;
+        }
+        uint16_t p = current++;
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [self connectToDeviceUDID:udid port:p];
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                if (!self.isConnected) tryNext();
+            });
+        });
+    };
+    tryNext();
+}
+
 - (void)disconnect {
     NSInputStream  *inStream  = self.inputStream;
     NSOutputStream *outStream = self.outputStream;
