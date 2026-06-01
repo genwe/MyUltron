@@ -26,7 +26,7 @@ iOS debugging desktop client. Connects to the MyUltronServer embedded in an iOS 
 | SQLite Browser | Select databases, browse table data, CRUD operations | ✅ |
 | Codec | Base64 / URL encode-decode and other encoding tools | ✅ |
 | Push Notifications | Send custom push messages to connected app | ✅ |
-| Network Monitor | Real-time network request monitoring | 🚧 |
+| Network Monitor | Real-time network monitoring with Mock support | ✅ |
 | Log Monitor | Real-time console log viewing | ✅ |
 | Analytics Monitor | Monitor analytics tracking events | 🚧 |
 | IM Session Monitor | Monitor IM session messages | 🚧 |
