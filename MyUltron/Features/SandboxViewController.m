@@ -9,6 +9,7 @@
 #import "SandboxViewController.h"
 #import "../ViewController.h"
 #import "../Core/MyUltronClient.h"
+#import "MyUltronTheme.h"
 
 // ---- Message keys ----
 static NSString * const kMsgVersion = @"version";
@@ -100,60 +101,52 @@ static NSString * const kTypeSandboxDelete    = @"sandboxDelete";
 #pragma mark - UI Construction
 
 - (void)buildUI {
-    CGFloat margin = 12;
-    CGFloat y      = self.view.bounds.size.height - 36;
+    CGFloat margin = [MyUltronTheme standardMargin];
 
     // ---- Path field ----
-    self.pathField = [[NSTextField alloc] initWithFrame:NSMakeRect(margin, y, 320, 24)];
+    self.pathField = [[NSTextField alloc] initWithFrame:NSZeroRect];
     self.pathField.editable   = NO;
     self.pathField.bordered   = YES;
     self.pathField.bezelStyle = NSTextFieldSquareBezel;
-    self.pathField.font       = [NSFont monospacedSystemFontOfSize:12 weight:NSFontWeightRegular];
-    self.pathField.autoresizingMask = NSViewMaxXMargin | NSViewMinYMargin;
+    self.pathField.font       = [MyUltronTheme monospacedFont];
+    self.pathField.translatesAutoresizingMaskIntoConstraints = NO;
     [self.view addSubview:self.pathField];
 
-    CGFloat x = NSMaxX(self.pathField.frame) + 6;
-    y += 1;
+    // ---- Toolbar buttons (SF Symbols) ----
+    self.backButton       = [MyUltronTheme symbolButton:@"arrow.left"        tooltip:NSLocalizedString(@"返回上级", nil)   target:self action:@selector(navigateUp:)];
+    self.refreshButton    = [MyUltronTheme symbolButton:@"arrow.clockwise"   tooltip:NSLocalizedString(@"刷新", nil)       target:self action:@selector(refreshListing:)];
+    self.addFolderButton  = [MyUltronTheme symbolButton:@"folder.badge.plus" tooltip:NSLocalizedString(@"新建文件夹", nil) target:self action:@selector(createFolder:)];
+    self.deleteButton     = [MyUltronTheme symbolButton:@"trash"             tooltip:NSLocalizedString(@"删除", nil)       target:self action:@selector(deleteSelected:)];
+    self.uploadButton     = [MyUltronTheme symbolButton:@"square.and.arrow.up"   tooltip:NSLocalizedString(@"上传", nil) target:self action:@selector(uploadFile:)];
+    self.downloadButton   = [MyUltronTheme symbolButton:@"square.and.arrow.down" tooltip:NSLocalizedString(@"下载", nil) target:self action:@selector(downloadFile:)];
 
-    // ---- Back (up) button ----
-    self.backButton = [self buttonWithTitle:NSLocalizedString(@"← 返回", nil) width:52 x:&x y:y];
-    self.backButton.action = @selector(navigateUp:);
+    for (NSButton *btn in @[self.backButton, self.refreshButton, self.addFolderButton,
+                             self.deleteButton, self.uploadButton, self.downloadButton]) {
+        [self.view addSubview:btn];
+    }
 
-    // ---- Refresh ----
-    self.refreshButton = [self buttonWithTitle:NSLocalizedString(@"↻ 刷新", nil) width:52 x:&x y:y];
-    self.refreshButton.action = @selector(refreshListing:);
-
-    // ---- New folder ----
-    self.addFolderButton = [self buttonWithTitle:NSLocalizedString(@"＋ 新建文件夹", nil) width:80 x:&x y:y];
-    self.addFolderButton.action = @selector(createFolder:);
-
-    // ---- Delete ----
-    self.deleteButton = [self buttonWithTitle:NSLocalizedString(@"✕ 删除", nil) width:52 x:&x y:y];
-    self.deleteButton.action = @selector(deleteSelected:);
-
-    x += 8;
-
-    // ---- Upload ----
-    self.uploadButton = [self buttonWithTitle:NSLocalizedString(@"↑ 上传", nil) width:52 x:&x y:y];
-    self.uploadButton.action = @selector(uploadFile:);
-
-    // ---- Download ----
-    self.downloadButton = [self buttonWithTitle:NSLocalizedString(@"↓ 下载", nil) width:52 x:&x y:y];
-    self.downloadButton.action = @selector(downloadFile:);
+    // ---- Stack the toolbar buttons horizontally ----
+    NSStackView *toolbarStack = [NSStackView stackViewWithViews:@[
+        self.pathField, self.backButton, self.refreshButton, self.addFolderButton,
+        self.deleteButton, self.uploadButton, self.downloadButton
+    ]];
+    toolbarStack.orientation = NSUserInterfaceLayoutOrientationHorizontal;
+    toolbarStack.spacing = 6;
+    toolbarStack.alignment = NSLayoutAttributeCenterY;
+    toolbarStack.translatesAutoresizingMaskIntoConstraints = NO;
+    [toolbarStack setContentCompressionResistancePriority:NSLayoutPriorityDefaultLow forOrientation:NSLayoutConstraintOrientationHorizontal];
+    [self.view addSubview:toolbarStack];
 
     // ---- Table view ----
-    CGFloat tableTop = y - 8;
-    NSRect tableFrame = NSMakeRect(margin, 32,
-                                   self.view.bounds.size.width - margin * 2,
-                                   tableTop - 32);
-
-    self.scrollView = [[NSScrollView alloc] initWithFrame:tableFrame];
-    self.scrollView.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
-    self.scrollView.borderType       = NSBezelBorder;
+    self.scrollView = [[NSScrollView alloc] initWithFrame:NSZeroRect];
+    self.scrollView.borderType = NSBezelBorder;
     self.scrollView.hasVerticalScroller = YES;
+    self.scrollView.translatesAutoresizingMaskIntoConstraints = NO;
 
-    self.tableView = [[NSTableView alloc] initWithFrame:self.scrollView.bounds];
-    self.tableView.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
+    self.tableView = [[NSTableView alloc] initWithFrame:NSZeroRect];
+    self.tableView.rowSizeStyle = NSTableViewRowSizeStyleCustom;
+    self.tableView.usesAlternatingRowBackgroundColors = YES;
+    self.tableView.allowsMultipleSelection = YES;
 
     NSArray *cols = @[
         @{@"id": @"type", @"title": NSLocalizedString(@"类型", nil),   @"w": @80},
@@ -172,37 +165,40 @@ static NSString * const kTypeSandboxDelete    = @"sandboxDelete";
     self.tableView.delegate     = self;
     self.tableView.doubleAction = @selector(tableViewDoubleClick:);
     self.tableView.target       = self;
-    self.tableView.allowsMultipleSelection = YES;
-    self.tableView.usesAlternatingRowBackgroundColors = YES;
 
     self.scrollView.documentView = self.tableView;
     [self.view addSubview:self.scrollView];
 
     // ---- Status bar ----
-    self.statusLabel = [[NSTextField alloc] initWithFrame:NSMakeRect(margin, 6, 400, 18)];
+    self.statusLabel = [[NSTextField alloc] initWithFrame:NSZeroRect];
     self.statusLabel.editable    = NO;
     self.statusLabel.bordered    = NO;
     self.statusLabel.drawsBackground = NO;
-    self.statusLabel.textColor   = [NSColor secondaryLabelColor];
-    self.statusLabel.font        = [NSFont systemFontOfSize:11];
-    self.statusLabel.autoresizingMask = NSViewMaxXMargin | NSViewMaxYMargin;
+    self.statusLabel.textColor   = [MyUltronTheme statusColor];
+    self.statusLabel.font        = [MyUltronTheme statusFont];
+    self.statusLabel.translatesAutoresizingMaskIntoConstraints = NO;
     [self.view addSubview:self.statusLabel];
-}
 
-- (NSButton *)buttonWithTitle:(NSString *)title
-                        width:(CGFloat)w
-                             x:(CGFloat *)x
-                             y:(CGFloat)y
-{
-    NSButton *btn = [[NSButton alloc] initWithFrame:NSMakeRect(*x, y, w, 24)];
-    btn.title          = title;
-    btn.bezelStyle     = NSBezelStyleSmallSquare;
-    btn.bordered       = NO;
-    btn.font           = [NSFont systemFontOfSize:12];
-    btn.autoresizingMask = NSViewMaxXMargin | NSViewMinYMargin;
-    [self.view addSubview:btn];
-    *x += w + 6;
-    return btn;
+    // ---- Auto Layout Constraints ----
+    [NSLayoutConstraint activateConstraints:@[
+        // Toolbar stack at top
+        [toolbarStack.topAnchor constraintEqualToAnchor:self.view.topAnchor constant:margin],
+        [toolbarStack.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:margin],
+        [toolbarStack.trailingAnchor constraintLessThanOrEqualToAnchor:self.view.trailingAnchor constant:-margin],
+
+        // Path field width
+        [self.pathField.widthAnchor constraintEqualToConstant:320],
+
+        // Table view fills remaining space
+        [self.scrollView.topAnchor constraintEqualToAnchor:toolbarStack.bottomAnchor constant:8],
+        [self.scrollView.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:margin],
+        [self.scrollView.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-margin],
+        [self.scrollView.bottomAnchor constraintEqualToAnchor:self.statusLabel.topAnchor constant:-4],
+
+        // Status bar at bottom
+        [self.statusLabel.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:margin],
+        [self.statusLabel.bottomAnchor constraintEqualToAnchor:self.view.bottomAnchor constant:-6],
+    ]];
 }
 
 #pragma mark - Table View Data Source
@@ -227,18 +223,35 @@ static NSString * const kTypeSandboxDelete    = @"sandboxDelete";
         tf.editable          = NO;
         tf.bordered          = NO;
         tf.drawsBackground   = NO;
-        tf.font              = [NSFont systemFontOfSize:12];
+        tf.font              = [MyUltronTheme tableFont];
         tf.lineBreakMode     = NSLineBreakByTruncatingTail;
         tf.cell.truncatesLastVisibleLine = YES;
+        tf.translatesAutoresizingMaskIntoConstraints = NO;
         [cell addSubview:tf];
         cell.textField = tf;
 
+        CGFloat leadingPad = 6;
         if ([colID isEqualToString:@"type"]) {
             NSImageView *iv = [[NSImageView alloc] initWithFrame:NSZeroRect];
             iv.imageScaling = NSImageScaleProportionallyDown;
+            iv.translatesAutoresizingMaskIntoConstraints = NO;
             [cell addSubview:iv];
             cell.imageView = iv;
+            leadingPad = 24;
+
+            [NSLayoutConstraint activateConstraints:@[
+                [iv.leadingAnchor constraintEqualToAnchor:cell.leadingAnchor constant:4],
+                [iv.centerYAnchor constraintEqualToAnchor:cell.centerYAnchor],
+                [iv.widthAnchor constraintEqualToConstant:16],
+                [iv.heightAnchor constraintEqualToConstant:16],
+            ]];
         }
+
+        [NSLayoutConstraint activateConstraints:@[
+            [tf.leadingAnchor constraintEqualToAnchor:cell.leadingAnchor constant:leadingPad],
+            [tf.trailingAnchor constraintEqualToAnchor:cell.trailingAnchor constant:-6],
+            [tf.centerYAnchor constraintEqualToAnchor:cell.centerYAnchor],
+        ]];
     }
 
     NSString *value = @"";
@@ -249,12 +262,6 @@ static NSString * const kTypeSandboxDelete    = @"sandboxDelete";
 
     cell.textField.stringValue = value;
 
-    // Constrain text field to column width, all columns vertically centered
-    CGFloat iconPad = ([colID isEqualToString:@"type"]) ? 22.0 : 4.0;
-    CGFloat colW    = column.width;
-    CGFloat rowH    = tableView.rowHeight;
-    cell.textField.frame = NSMakeRect(iconPad, (rowH - 16) / 2, colW - iconPad - 4, 16);
-
     // Icon only for type column
     if ([colID isEqualToString:@"type"]) {
         NSImage *icon = e.isDir
@@ -262,10 +269,13 @@ static NSString * const kTypeSandboxDelete    = @"sandboxDelete";
             : [[NSWorkspace sharedWorkspace] iconForFileType:(__bridge NSString *)kUTTypeData];
         icon.size = NSMakeSize(16, 16);
         cell.imageView.image = icon;
-        cell.imageView.frame = NSMakeRect(2, (rowH - 16) / 2, 16, 16);
     }
 
     return cell;
+}
+
+- (CGFloat)tableView:(NSTableView *)tableView heightOfRow:(NSInteger)row {
+    return [MyUltronTheme tableRowHeight];
 }
 
 #pragma mark - Table View Actions

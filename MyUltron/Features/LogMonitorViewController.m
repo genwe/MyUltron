@@ -7,6 +7,7 @@
 //
 
 #import "LogMonitorViewController.h"
+#import "MyUltronTheme.h"
 #include <libimobiledevice/libimobiledevice.h>
 #include <libimobiledevice/lockdown.h>
 #include <libimobiledevice/syslog_relay.h>
@@ -51,34 +52,44 @@
     // Filter field (bundle ID)
     _filterField = [[NSTextField alloc] initWithFrame:NSMakeRect(8, y - 26, 130, 24)];
     _filterField.placeholderString = @"Bundle ID…";
-    _filterField.font = [NSFont systemFontOfSize:11];
+    _filterField.font = [MyUltronTheme tableFont];
     _filterField.autoresizingMask = NSViewMaxXMargin | NSViewMinYMargin;
     [self.view addSubview:_filterField];
 
     // Keyword filter
     _keywordField = [[NSTextField alloc] initWithFrame:NSMakeRect(142, y - 26, 100, 24)];
     _keywordField.placeholderString = @"关键字…";
-    _keywordField.font = [NSFont systemFontOfSize:11];
+    _keywordField.font = [MyUltronTheme tableFont];
     _keywordField.autoresizingMask = NSViewMaxXMargin | NSViewMinYMargin;
     [self.view addSubview:_keywordField];
 
-    // Start/Stop button
-    _startStopBtn = [NSButton buttonWithTitle:NSLocalizedString(NSLocalizedString(@"▶ 开始", nil), nil) target:self action:@selector(toggleCapture:)];
-    _startStopBtn.frame = NSMakeRect(248, y - 26, 70, 26);
+    // Start/Stop button (SF Symbol)
+    if (@available(macOS 11.0, *)) {
+        _startStopBtn = [NSButton buttonWithImage:[NSImage imageWithSystemSymbolName:@"play.fill" accessibilityDescription:@"Start"]
+                                           target:self
+                                           action:@selector(toggleCapture:)];
+    } else {
+        _startStopBtn = [NSButton buttonWithTitle:NSLocalizedString(NSLocalizedString(@"▶ 开始", nil), nil)
+                                           target:self
+                                           action:@selector(toggleCapture:)];
+    }
+    _startStopBtn.frame = NSMakeRect(248, y - 26, 36, 26);
     _startStopBtn.bezelStyle = NSBezelStyleRounded;
+    _startStopBtn.toolTip = NSLocalizedString(@"开始捕获", nil);
     _startStopBtn.autoresizingMask = NSViewMaxXMargin | NSViewMinYMargin;
     [self.view addSubview:_startStopBtn];
 
     // Clear button
-    _clearBtn = [NSButton buttonWithTitle:NSLocalizedString(@"清空", nil) target:self action:@selector(clearLog:)];
-    _clearBtn.frame = NSMakeRect(322, y - 26, 56, 26);
-    _clearBtn.bezelStyle = NSBezelStyleRounded;
+    _clearBtn = [MyUltronTheme compactButtonWithTitle:NSLocalizedString(@"清空", nil)
+                                              target:self
+                                              action:@selector(clearLog:)];
+    _clearBtn.frame = NSMakeRect(288, y - 26, 56, 26);
     _clearBtn.autoresizingMask = NSViewMaxXMargin | NSViewMinYMargin;
     [self.view addSubview:_clearBtn];
 
     // Auto scroll toggle
     _autoScrollBtn = [NSButton buttonWithTitle:NSLocalizedString(@"自动滚屏", nil) target:self action:@selector(toggleAutoScroll:)];
-    _autoScrollBtn.frame = NSMakeRect(382, y - 26, 86, 26);
+    _autoScrollBtn.frame = NSMakeRect(348, y - 26, 86, 26);
     [_autoScrollBtn setButtonType:NSButtonTypeSwitch];
     _autoScrollBtn.state = NSControlStateValueOn;
     _autoScrollBtn.autoresizingMask = NSViewMaxXMargin | NSViewMinYMargin;
@@ -92,7 +103,7 @@
 
     _textView = [[NSTextView alloc] initWithFrame:sv.bounds];
     _textView.editable = NO;
-    _textView.font = [NSFont monospacedSystemFontOfSize:10.5 weight:NSFontWeightRegular];
+    _textView.font = [MyUltronTheme monospacedFont];
     _textView.backgroundColor = [NSColor textBackgroundColor];
     _textView.textColor = [NSColor systemGreenColor];
     _textView.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
@@ -115,7 +126,12 @@
         return;
     }
     _running = YES;
-    _startStopBtn.title = NSLocalizedString(@"■ 停止", nil);
+    if (@available(macOS 11.0, *)) {
+        _startStopBtn.image = [NSImage imageWithSystemSymbolName:@"stop.fill" accessibilityDescription:@"Stop"];
+        _startStopBtn.toolTip = NSLocalizedString(@"停止捕获", nil);
+    } else {
+        _startStopBtn.title = NSLocalizedString(@"■ 停止", nil);
+    }
     _textView.string = NSLocalizedString(@"正在连接设备…\n", nil);
 
     // Auto-set filter from selected app's bundle ID if not manually set
@@ -266,7 +282,12 @@
         _captureQueue = nil;
     }
     _running = NO;
-    _startStopBtn.title = NSLocalizedString(NSLocalizedString(@"▶ 开始", nil), nil);
+    if (@available(macOS 11.0, *)) {
+        _startStopBtn.image = [NSImage imageWithSystemSymbolName:@"play.fill" accessibilityDescription:@"Start"];
+        _startStopBtn.toolTip = NSLocalizedString(@"开始捕获", nil);
+    } else {
+        _startStopBtn.title = NSLocalizedString(NSLocalizedString(@"▶ 开始", nil), nil);
+    }
     _captureQueue = nil;
 }
 

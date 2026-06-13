@@ -32,7 +32,7 @@
     label.selectable = NO;
     label.alignment = NSTextAlignmentCenter;
     label.textColor = [NSColor secondaryLabelColor];
-    label.font = [NSFont systemFontOfSize:16];
+    label.font = [NSFont systemFontOfSize:14];
     [label sizeToFit];
 
     label.translatesAutoresizingMaskIntoConstraints = NO;

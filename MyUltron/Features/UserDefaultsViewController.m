@@ -8,6 +8,7 @@
 #import "UserDefaultsViewController.h"
 #import "../ViewController.h"
 #import "../Core/MyUltronClient.h"
+#import "MyUltronTheme.h"
 
 static NSString * const kMsgVersion = @"version";
 static NSString * const kMsgType    = @"messageType";
@@ -58,14 +59,34 @@ static NSString * const kMsgContent = @"content";
 #pragma mark - UI
 
 - (void)buildUI {
-    CGFloat margin = 12;
+    CGFloat margin = [MyUltronTheme standardMargin];
     CGFloat y = self.view.bounds.size.height - 40;
 
-    self.addButton = [self button:@"＋ 新增" x:margin y:y action:@selector(addKey:)];
-    CGFloat x = NSMaxX(self.addButton.frame) + 8;
-    self.editButton = [self button:NSLocalizedString(@"✎ 编辑", nil) x:x y:y action:@selector(editKey:)];
-    x = NSMaxX(self.editButton.frame) + 8;
-    self.deleteButton = [self button:NSLocalizedString(@"✕ 删除", nil) x:x y:y action:@selector(deleteKey:)];
+    self.addButton = [MyUltronTheme symbolButton:@"plus"
+                                         tooltip:NSLocalizedString(@"新增", nil)
+                                          target:self
+                                          action:@selector(addKey:)];
+    self.addButton.frame = NSMakeRect(margin, y, 36, 26);
+    self.addButton.autoresizingMask = NSViewMaxXMargin | NSViewMinYMargin;
+    [self.view addSubview:self.addButton];
+
+    CGFloat x = NSMaxX(self.addButton.frame) + 4;
+    self.editButton = [MyUltronTheme symbolButton:@"square.and.pencil"
+                                          tooltip:NSLocalizedString(@"编辑", nil)
+                                           target:self
+                                           action:@selector(editKey:)];
+    self.editButton.frame = NSMakeRect(x, y, 36, 26);
+    self.editButton.autoresizingMask = NSViewMaxXMargin | NSViewMinYMargin;
+    [self.view addSubview:self.editButton];
+
+    x = NSMaxX(self.editButton.frame) + 4;
+    self.deleteButton = [MyUltronTheme symbolButton:@"trash"
+                                            tooltip:NSLocalizedString(@"删除", nil)
+                                             target:self
+                                             action:@selector(deleteKey:)];
+    self.deleteButton.frame = NSMakeRect(x, y, 36, 26);
+    self.deleteButton.autoresizingMask = NSViewMaxXMargin | NSViewMinYMargin;
+    [self.view addSubview:self.deleteButton];
 
     CGFloat tableTop = y - 8;
     NSRect tableFrame = NSMakeRect(margin, 32,
@@ -78,6 +99,7 @@ static NSString * const kMsgContent = @"content";
 
     self.tableView = [[NSTableView alloc] initWithFrame:self.scrollView.bounds];
     self.tableView.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
+    self.tableView.rowSizeStyle = NSTableViewRowSizeStyleCustom;
     for (NSDictionary *c in @[
         @{@"id":@"key",  @"title":@"Key",   @"w":@220},
         @{@"id":@"type", @"title":@"Type",  @"w":@80},
@@ -100,21 +122,10 @@ static NSString * const kMsgContent = @"content";
     self.statusLabel.editable = NO;
     self.statusLabel.bordered = NO;
     self.statusLabel.drawsBackground = NO;
-    self.statusLabel.textColor = [NSColor secondaryLabelColor];
-    self.statusLabel.font = [NSFont systemFontOfSize:11];
+    self.statusLabel.textColor = [MyUltronTheme statusColor];
+    self.statusLabel.font = [MyUltronTheme statusFont];
     self.statusLabel.autoresizingMask = NSViewMaxXMargin | NSViewMaxYMargin;
     [self.view addSubview:self.statusLabel];
-}
-
-- (NSButton *)button:(NSString *)title x:(CGFloat)x y:(CGFloat)y action:(SEL)sel {
-    NSButton *b = [[NSButton alloc] initWithFrame:NSMakeRect(x, y, 80, 26)];
-    b.title = title;
-    b.bezelStyle = NSBezelStyleRounded;
-    b.target = self;
-    b.action = sel;
-    b.autoresizingMask = NSViewMaxXMargin | NSViewMinYMargin;
-    [self.view addSubview:b];
-    return b;
 }
 
 #pragma mark - Table
@@ -124,24 +135,17 @@ static NSString * const kMsgContent = @"content";
 - (NSView *)tableView:(NSTableView *)tableView viewForTableColumn:(NSTableColumn *)column row:(NSInteger)row {
     UDEntry *e = self.entries[row];
     NSString *cid = column.identifier;
-    NSTableCellView *cell = [tableView makeViewWithIdentifier:cid owner:self];
-    if (!cell) {
-        cell = [[NSTableCellView alloc] initWithFrame:NSZeroRect];
-        cell.identifier = cid;
-        NSTextField *tf = [[NSTextField alloc] initWithFrame:NSZeroRect];
-        tf.editable = NO; tf.bordered = NO; tf.drawsBackground = NO;
-        tf.font = [NSFont systemFontOfSize:12];
-        tf.lineBreakMode = NSLineBreakByTruncatingTail;
-        [cell addSubview:tf]; cell.textField = tf;
-    }
+    NSTableCellView *cell = [MyUltronTheme tableCellWithIdentifier:cid inTable:tableView monospaced:[cid isEqualToString:@"val"]];
     NSString *v = @"";
     if ([cid isEqualToString:@"key"])  v = e.key;
     else if ([cid isEqualToString:@"type"]) v = e.type;
     else if ([cid isEqualToString:@"val"])  v = e.preview;
     cell.textField.stringValue = v;
-    CGFloat rowH = tableView.rowHeight;
-    cell.textField.frame = NSMakeRect(4, (rowH - 16) / 2, column.width - 8, 16);
     return cell;
+}
+
+- (CGFloat)tableView:(NSTableView *)tableView heightOfRow:(NSInteger)row {
+    return [MyUltronTheme tableRowHeight];
 }
 
 - (void)tableViewDoubleClick:(id)sender { [self editKey:sender]; }

@@ -7,6 +7,7 @@
 
 #import "CodecViewController.h"
 #import <CommonCrypto/CommonDigest.h>
+#import "MyUltronTheme.h"
 
 @interface CodecViewController ()
 @property (nonatomic, strong) NSTextView    *inputView;
@@ -46,18 +47,24 @@
     self.operationPopup.autoresizingMask = NSViewMaxXMargin | NSViewMinYMargin;
     [self.view addSubview:self.operationPopup];
 
-    self.executeBtn = [self btn:@"Execute" x:NSMaxX(self.operationPopup.frame)+8
+    self.executeBtn = [self btn:NSLocalizedString(@"Execute", nil) x:NSMaxX(self.operationPopup.frame)+8
                                y:self.view.bounds.size.height-36 action:@selector(execute:)];
-    self.swapBtn    = [self btn:@"⇅ Swap" x:NSMaxX(self.executeBtn.frame)+8
-                               y:self.view.bounds.size.height-36 action:@selector(swapInputOutput:)];
-    self.aCopyBtn    = [self btn:@"Copy" x:NSMaxX(self.swapBtn.frame)+8
+    self.swapBtn = [MyUltronTheme symbolButton:@"arrow.up.arrow.down"
+                                       tooltip:NSLocalizedString(@"交换输入输出", nil)
+                                        target:self
+                                        action:@selector(swapInputOutput:)];
+    self.swapBtn.frame = NSMakeRect(NSMaxX(self.executeBtn.frame)+8, self.view.bounds.size.height-36, 36, 26);
+    self.swapBtn.autoresizingMask = NSViewMaxXMargin | NSViewMinYMargin;
+    [self.view addSubview:self.swapBtn];
+
+    self.aCopyBtn = [self btn:NSLocalizedString(@"Copy", nil) x:NSMaxX(self.swapBtn.frame)+8
                                y:self.view.bounds.size.height-36 action:@selector(copyOutput:)];
 
     // ---- Input ----
     NSTextField *inLabel = [[NSTextField alloc] initWithFrame:NSMakeRect(margin, self.view.bounds.size.height - 68, 200, 18)];
     inLabel.editable = NO; inLabel.bordered = NO; inLabel.drawsBackground = NO;
-    inLabel.stringValue = @"Input:";
-    inLabel.font = [NSFont boldSystemFontOfSize:12];
+    inLabel.stringValue = NSLocalizedString(@"Input:", nil);
+    inLabel.font = [MyUltronTheme tableBoldFont];
     inLabel.autoresizingMask = NSViewMaxXMargin | NSViewMinYMargin;
     [self.view addSubview:inLabel];
 
@@ -68,15 +75,15 @@
 
     self.inputView = [[NSTextView alloc] initWithFrame:inScroll.bounds];
     self.inputView.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
-    self.inputView.font = [NSFont monospacedSystemFontOfSize:12 weight:NSFontWeightRegular];
+    self.inputView.font = [MyUltronTheme monospacedFont];
     inScroll.documentView = self.inputView;
     [self.view addSubview:inScroll];
 
     // ---- Output ----
     NSTextField *outLabel = [[NSTextField alloc] initWithFrame:NSMakeRect(margin, margin + halfH - 6, 200, 18)];
     outLabel.editable = NO; outLabel.bordered = NO; outLabel.drawsBackground = NO;
-    outLabel.stringValue = @"Output:";
-    outLabel.font = [NSFont boldSystemFontOfSize:12];
+    outLabel.stringValue = NSLocalizedString(@"Output:", nil);
+    outLabel.font = [MyUltronTheme tableBoldFont];
     outLabel.autoresizingMask = NSViewMaxXMargin | NSViewMaxYMargin;
     [self.view addSubview:outLabel];
 
@@ -88,7 +95,7 @@
     self.outputView = [[NSTextView alloc] initWithFrame:outScroll.bounds];
     self.outputView.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
     self.outputView.editable = NO;
-    self.outputView.font = [NSFont monospacedSystemFontOfSize:12 weight:NSFontWeightRegular];
+    self.outputView.font = [MyUltronTheme monospacedFont];
     outScroll.documentView = self.outputView;
     [self.view addSubview:outScroll];
 }

@@ -9,6 +9,7 @@
 #import "DeviceScreenshotViewController.h"
 #import "../ViewController.h"
 #import "../Core/MyUltronClient.h"
+#import "MyUltronTheme.h"
 
 static NSString * const kMsgVersion = @"version";
 static NSString * const kMsgType    = @"messageType";
@@ -82,7 +83,10 @@ static NSString * const kMsgContent = @"content";
     // ---- 截图预览区域 ----
     _imageView = [[NSImageView alloc] initWithFrame:NSZeroRect];
     _imageView.imageScaling     = NSImageScaleProportionallyUpOrDown;
-    _imageView.imageFrameStyle  = NSImageFrameGrayBezel;
+    _imageView.wantsLayer = YES;
+    _imageView.layer.cornerRadius = 8;
+    _imageView.layer.borderWidth = 0.5;
+    _imageView.layer.borderColor = [NSColor separatorColor].CGColor;
     _imageView.translatesAutoresizingMaskIntoConstraints = NO;
     [self.view addSubview:_imageView];
 
@@ -109,8 +113,8 @@ static NSString * const kMsgContent = @"content";
     _statusLabel.bordered   = NO;
     _statusLabel.selectable = NO;
     _statusLabel.backgroundColor = [NSColor clearColor];
-    _statusLabel.textColor  = [NSColor secondaryLabelColor];
-    _statusLabel.font       = [NSFont systemFontOfSize:12];
+    _statusLabel.textColor  = [MyUltronTheme statusColor];
+    _statusLabel.font       = [MyUltronTheme statusFont];
     _statusLabel.stringValue = NSLocalizedString(@"正在检测连接…", nil);
     _statusLabel.translatesAutoresizingMaskIntoConstraints = NO;
     [self.view addSubview:_statusLabel];

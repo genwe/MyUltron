@@ -9,6 +9,7 @@
 #import "MessagePushViewController.h"
 #import "../ViewController.h"
 #import "../Core/MyUltronClient.h"
+#import "MyUltronTheme.h"
 
 static NSString * const kMsgVersion = @"version";
 static NSString * const kMsgType    = @"messageType";
@@ -91,7 +92,7 @@ static NSString * const kDefaultPayload =
     inputLabel.bordered = NO;
     inputLabel.selectable = NO;
     inputLabel.backgroundColor = [NSColor clearColor];
-    inputLabel.font = [NSFont boldSystemFontOfSize:12];
+    inputLabel.font = [MyUltronTheme tableBoldFont];
     inputLabel.translatesAutoresizingMaskIntoConstraints = NO;
     [self.view addSubview:inputLabel];
 
@@ -102,7 +103,7 @@ static NSString * const kDefaultPayload =
     _scrollView.translatesAutoresizingMaskIntoConstraints = NO;
 
     _textView = [[NSTextView alloc] initWithFrame:NSZeroRect];
-    _textView.font = [NSFont monospacedSystemFontOfSize:12 weight:NSFontWeightRegular];
+    _textView.font = [MyUltronTheme monospacedFont];
     _textView.string = kDefaultPayload;
     _textView.backgroundColor = [NSColor textBackgroundColor];
     _textView.textColor = [NSColor textColor];
@@ -127,8 +128,8 @@ static NSString * const kDefaultPayload =
     _statusLabel.bordered = NO;
     _statusLabel.selectable = NO;
     _statusLabel.backgroundColor = [NSColor clearColor];
-    _statusLabel.textColor = [NSColor secondaryLabelColor];
-    _statusLabel.font = [NSFont systemFontOfSize:12];
+    _statusLabel.textColor = [MyUltronTheme statusColor];
+    _statusLabel.font = [MyUltronTheme statusFont];
     _statusLabel.stringValue = NSLocalizedString(@"正在检测连接…", nil);
     _statusLabel.translatesAutoresizingMaskIntoConstraints = NO;
     [self.view addSubview:_statusLabel];

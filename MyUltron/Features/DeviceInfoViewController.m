@@ -10,6 +10,7 @@
 #include <libimobiledevice/libimobiledevice.h>
 #include <libimobiledevice/lockdown.h>
 #include <plist/plist.h>
+#import "MyUltronTheme.h"
 
 @interface DeviceInfoViewController () <NSTableViewDataSource, NSTableViewDelegate>
 
@@ -52,8 +53,8 @@
     _statusLabel.bordered = NO;
     _statusLabel.selectable = NO;
     _statusLabel.backgroundColor = [NSColor clearColor];
-    _statusLabel.textColor = [NSColor secondaryLabelColor];
-    _statusLabel.font = [NSFont systemFontOfSize:12];
+    _statusLabel.textColor = [MyUltronTheme statusColor];
+    _statusLabel.font = [MyUltronTheme statusFont];
     _statusLabel.stringValue = NSLocalizedString(@"正在加载设备信息…", nil);
     _statusLabel.translatesAutoresizingMaskIntoConstraints = NO;
     [self.view addSubview:_statusLabel];
@@ -368,13 +369,13 @@
 
     // Bold for label column
     cell.textField.font = isLabel
-        ? [NSFont boldSystemFontOfSize:12]
-        : [NSFont monospacedSystemFontOfSize:11 weight:NSFontWeightRegular];
+        ? [MyUltronTheme tableBoldFont]
+        : [MyUltronTheme monospacedFont];
 
-    // Adjust frame for vertical centering
+    // Constrain cell text field
     CGFloat rowHeight = tableView.rowHeight;
-    cell.textField.frame = NSMakeRect(4, (rowHeight - 16) / 2,
-                                       tableColumn.width - 8, 16);
+    cell.textField.frame = NSMakeRect(6, (rowHeight - 16) / 2,
+                                       tableColumn.width - 12, 16);
 
     return cell;
 }
@@ -382,7 +383,7 @@
 #pragma mark - NSTableViewDelegate
 
 - (CGFloat)tableView:(NSTableView *)tableView heightOfRow:(NSInteger)row {
-    return 28;
+    return [MyUltronTheme tableRowHeight];
 }
 
 @end

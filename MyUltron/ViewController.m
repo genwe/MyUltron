@@ -22,6 +22,7 @@
 #import "Features/XlogParserViewController.h"
 #import "Core/MyUltronClient.h"
 #import "Features/FeatureViewController.h"
+#import "Features/MyUltronTheme.h"
 
 #include <libimobiledevice/libimobiledevice.h>
 #include <libimobiledevice/lockdown.h>
@@ -89,11 +90,14 @@ static NSString * const kPrefFeatureConfig = @"MyUltronFeatureConfig";
 @property (nonatomic, strong) FeatureViewController *currentFeatureVC;
 @property (nonatomic, strong) NSMutableDictionary<NSString *, FeatureViewController *> *featureVCCache;
 
+// Toolbar
+@property (nonatomic, strong) NSVisualEffectView *toolbarView;
+@property (nonatomic, strong) NSImageView *statusIndicator;
+
 // Settings
 @property (nonatomic, strong) NSButton *settingsButton;
 @property (nonatomic, strong) NSMutableArray<NSMutableDictionary *> *featureConfig;
 @property (nonatomic, strong) NSMutableArray<NSMutableDictionary *> *settingsEditConfig;
-@property (nonatomic, weak)   NSView *settingsContentView;
 
 // Connection layer
 @property (nonatomic, strong, readwrite) MyUltronClient *client;
@@ -123,57 +127,105 @@ static NSString * const kPrefFeatureConfig = @"MyUltronFeatureConfig";
 - (void)viewDidLoad {
     [super viewDidLoad];
 
-    self.deviceButton = [NSButton buttonWithTitle:NSLocalizedString(@"连接设备", nil) target:self action:@selector(showDeviceMenu:)];
-    self.deviceButton.frame = NSMakeRect(16, self.view.bounds.size.height - 44, 140, 32);
-    self.deviceButton.autoresizingMask = NSViewMaxXMargin | NSViewMinYMargin;
-    [self.view addSubview:self.deviceButton];
+    CGFloat toolbarHeight = 48;
+    CGFloat viewW = self.view.bounds.size.width;
+    CGFloat viewH = self.view.bounds.size.height;
 
-    self.appButton = [NSButton buttonWithTitle:NSLocalizedString(@"选择App", nil) target:self action:@selector(showAppMenu:)];
-    self.appButton.frame = NSMakeRect(164, self.view.bounds.size.height - 44, 140, 32);
-    self.appButton.autoresizingMask = NSViewMaxXMargin | NSViewMinYMargin;
-    [self.view addSubview:self.appButton];
+    // ---- Toolbar: NSVisualEffectView ----
+    self.toolbarView = [[NSVisualEffectView alloc] initWithFrame:NSMakeRect(0, viewH - toolbarHeight, viewW, toolbarHeight)];
+    self.toolbarView.autoresizingMask = NSViewWidthSizable | NSViewMinYMargin;
+    self.toolbarView.blendingMode = NSVisualEffectBlendingModeBehindWindow;
+    self.toolbarView.material = NSVisualEffectMaterialTitlebar;
+    self.toolbarView.state = NSVisualEffectStateActive;
+    [self.view addSubview:self.toolbarView];
+
+    // Toolbar bottom separator
+    NSBox *toolbarSeparator = [[NSBox alloc] initWithFrame:NSMakeRect(0, 0, viewW, 1)];
+    toolbarSeparator.boxType = NSBoxSeparator;
+    toolbarSeparator.autoresizingMask = NSViewWidthSizable | NSViewMaxYMargin;
+    [self.toolbarView addSubview:toolbarSeparator];
+
+    // Device button
+    self.deviceButton = [MyUltronTheme buttonWithTitle:NSLocalizedString(@"连接设备", nil) target:self action:@selector(showDeviceMenu:)];
+    self.deviceButton.frame = NSMakeRect(12, (toolbarHeight - 32) / 2, 140, 32);
+    self.deviceButton.autoresizingMask = NSViewMaxXMargin;
+    [self.toolbarView addSubview:self.deviceButton];
+
+    // App button
+    self.appButton = [MyUltronTheme buttonWithTitle:NSLocalizedString(@"选择App", nil) target:self action:@selector(showAppMenu:)];
+    self.appButton.frame = NSMakeRect(160, (toolbarHeight - 32) / 2, 140, 32);
+    self.appButton.autoresizingMask = NSViewMaxXMargin;
+    [self.toolbarView addSubview:self.appButton];
+
+    // Connection status indicator (green/gray dot)
+    self.statusIndicator = [[NSImageView alloc] initWithFrame:NSMakeRect(viewW - 78, (toolbarHeight - 12) / 2, 12, 12)];
+    self.statusIndicator.autoresizingMask = NSViewMinXMargin;
+    self.statusIndicator.image = [NSImage imageWithSystemSymbolName:@"circle.fill" accessibilityDescription:@"Disconnected"];
+    self.statusIndicator.contentTintColor = [NSColor systemGrayColor];
+    self.statusIndicator.toolTip = NSLocalizedString(@"未连接", nil);
+    [self.toolbarView addSubview:self.statusIndicator];
 
     // Settings gear button (top-right)
-    self.settingsButton = [NSButton buttonWithTitle:@"⚙" target:self action:@selector(openFeatureSettings:)];
+    self.settingsButton = [[NSButton alloc] initWithFrame:NSMakeRect(viewW - 60, (toolbarHeight - 28) / 2, 32, 28)];
+    if (@available(macOS 11.0, *)) {
+        NSImage *gear = [NSImage imageWithSystemSymbolName:@"gearshape" accessibilityDescription:@"Settings"];
+        self.settingsButton.image = gear;
+        self.settingsButton.imagePosition = NSImageOnly;
+    } else {
+        self.settingsButton.title = @"⚙";
+    }
     self.settingsButton.bezelStyle = NSBezelStyleRounded;
-    self.settingsButton.frame = NSMakeRect(self.view.bounds.size.width - 42,
-                                            self.view.bounds.size.height - 40, 32, 28);
-    self.settingsButton.autoresizingMask = NSViewMinXMargin | NSViewMinYMargin;
-    self.settingsButton.font = [NSFont systemFontOfSize:18];
-    [self.view addSubview:self.settingsButton];
+    self.settingsButton.autoresizingMask = NSViewMinXMargin;
+    self.settingsButton.target = self;
+    self.settingsButton.action = @selector(openFeatureSettings:);
+    self.settingsButton.toolTip = NSLocalizedString(@"功能列表设置", nil);
+    [self.toolbarView addSubview:self.settingsButton];
 
     // Init feature config & rebuild sidebar
     [self loadFeatureConfig];
 
-    CGFloat listTop = self.view.bounds.size.height - 52;
-    NSScrollView *scrollView = [[NSScrollView alloc] initWithFrame:NSMakeRect(16, 20, 200, listTop - 20)];
-    scrollView.autoresizingMask = NSViewMaxXMargin | NSViewHeightSizable | NSViewMinYMargin;
-    scrollView.borderType = NSBezelBorder;
+    CGFloat listTop = viewH - toolbarHeight - 12;
+    CGFloat sidebarWidth = 200;
+
+    // Sidebar background
+    NSView *sidebarBackground = [[NSView alloc] initWithFrame:NSMakeRect(0, 0, sidebarWidth, listTop)];
+    sidebarBackground.wantsLayer = YES;
+    sidebarBackground.autoresizingMask = NSViewMaxXMargin | NSViewHeightSizable;
+    [self.view addSubview:sidebarBackground];
+
+    NSScrollView *scrollView = [[NSScrollView alloc] initWithFrame:NSMakeRect(16, 0, sidebarWidth - 16, listTop)];
+    scrollView.autoresizingMask = NSViewMaxXMargin | NSViewHeightSizable;
+    scrollView.borderType = NSNoBorder;
     scrollView.hasVerticalScroller = YES;
+    scrollView.drawsBackground = NO;
 
     NSTableView *tableView = [[NSTableView alloc] initWithFrame:scrollView.bounds];
     tableView.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
 
     NSTableColumn *column = [[NSTableColumn alloc] initWithIdentifier:@"feature"];
     column.title = NSLocalizedString(@"功能列表", nil);
-    column.width = scrollView.bounds.size.width;
+    column.width = sidebarWidth - 16;
     [tableView addTableColumn:column];
     tableView.headerView = nil;
     tableView.dataSource = self;
     tableView.delegate = self;
     tableView.usesAlternatingRowBackgroundColors = YES;
+    tableView.rowSizeStyle = NSTableViewRowSizeStyleCustom;
 
     scrollView.documentView = tableView;
     self.scrollView = scrollView;
     self.tableView = tableView;
     [self.view addSubview:scrollView];
 
-    NSRect containerFrame = NSMakeRect(232, 20, self.view.bounds.size.width - 232 - 16, listTop - 20);
+    // ---- Content container with rounded corners ----
+    CGFloat containerX = sidebarWidth + 16;
+    NSRect containerFrame = NSMakeRect(containerX, 0, viewW - containerX - 16, listTop);
     self.containerView = [[NSView alloc] initWithFrame:containerFrame];
-    self.containerView.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable | NSViewMinYMargin;
+    self.containerView.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
     self.containerView.wantsLayer = YES;
-    self.containerView.layer.borderWidth = 1;
-    [self updateLayerColors];
+    self.containerView.layer.cornerRadius = 6;
+    self.containerView.layer.borderWidth = 0.5;
+    self.containerView.layer.borderColor = [NSColor separatorColor].CGColor;
     [self.view addSubview:self.containerView];
 
     // Register drag-and-drop for .app / .ipa files
@@ -199,10 +251,13 @@ static NSString * const kPrefFeatureConfig = @"MyUltronFeatureConfig";
 
 - (void)updateLayerColors {
     [NSApp.effectiveAppearance performAsCurrentDrawingAppearance:^{
-        self.containerView.layer.backgroundColor = [[NSColor controlBackgroundColor] CGColor];
-        self.containerView.layer.borderColor     = [[NSColor separatorColor] CGColor];
+        CGColorRef sep   = [[NSColor separatorColor] CGColor];
+        CGColorRef bg    = [[NSColor controlBackgroundColor] CGColor];
+        self.containerView.layer.backgroundColor = bg;
+        self.containerView.layer.borderColor     = sep;
     }];
     self.containerView.needsDisplay = YES;
+    self.tableView.needsDisplay = YES;
 }
 
 - (void)observeValueForKeyPath:(NSString *)keyPath
@@ -241,80 +296,36 @@ static NSString * const kPrefFeatureConfig = @"MyUltronFeatureConfig";
 }
 
 - (void)loadFeatureConfig {
-    NSArray *saved = [[NSUserDefaults standardUserDefaults] arrayForKey:kPrefFeatureConfig];
+    // 始终使用 defaultFeatureConfig 的固定顺序
     _featureConfig = [NSMutableArray array];
-    BOOL loaded = NO;
-    if (saved && [saved isKindOfClass:[NSArray class]] && saved.count > 0) {
-        for (id item in saved) {
-            if (![item isKindOfClass:[NSDictionary class]]) { loaded = NO; break; }
-            NSDictionary *d = (NSDictionary *)item;
-            NSMutableDictionary *md = [NSMutableDictionary dictionary];
-            
-            // Validate name
-            id nameVal = d[@"name"];
-            if (![nameVal isKindOfClass:[NSString class]]) { loaded = NO; break; }
-            md[@"name"] = nameVal;
-            
-            // Validate class
-            id classVal = d[@"class"];
-            Class cls = nil;
-            if ([classVal isKindOfClass:[NSString class]]) {
-                cls = NSClassFromString(classVal);
-            } else if (classVal) {
-                cls = classVal; // Legacy Class object
-            }
-            if (!cls) { loaded = NO; break; }
-            md[@"class"] = cls;
-            
-            // Validate visible
-            id visVal = d[@"visible"];
-            md[@"visible"] = [visVal isKindOfClass:[NSNumber class]] ? visVal : @YES;
-            
-            [_featureConfig addObject:md];
-            loaded = YES;
-        }
+    for (NSDictionary *d in [self defaultFeatureConfig]) {
+        [_featureConfig addObject:[NSMutableDictionary dictionaryWithDictionary:d]];
+        _featureConfig.lastObject[@"visible"] = @YES;
     }
-    if (!loaded) {
-        [[NSUserDefaults standardUserDefaults] removeObjectForKey:kPrefFeatureConfig];
-        [_featureConfig removeAllObjects];
-        for (NSDictionary *d in [self defaultFeatureConfig]) {
-            [_featureConfig addObject:[NSMutableDictionary dictionaryWithDictionary:d]];
-            _featureConfig.lastObject[@"visible"] = @YES;
+
+    // 仅从存储中恢复可见性状态（不依赖顺序，按 className 匹配）
+    NSDictionary *savedVisibility = [[NSUserDefaults standardUserDefaults] dictionaryForKey:kPrefFeatureConfig];
+    if ([savedVisibility isKindOfClass:[NSDictionary class]]) {
+        for (NSMutableDictionary *md in _featureConfig) {
+            NSString *className = NSStringFromClass(md[@"class"]);
+            NSNumber *vis = savedVisibility[className];
+            if ([vis isKindOfClass:[NSNumber class]]) {
+                md[@"visible"] = vis;
+            }
         }
     }
 
-    // 无论从 defaults 加载还是用默认配置，name 都重新从 defaultFeatureConfig 取
-    // 这样 NSLocalizedString 每次都能根据当前语言正确解析
-    NSArray *defaults = [self defaultFeatureConfig];
-    for (NSUInteger i = 0; i < _featureConfig.count && i < defaults.count; i++) {
-        _featureConfig[i][@"name"] = defaults[i][@"name"];
-    }
     [self rebuildFeatureArrays];
 }
 
 - (void)saveFeatureConfig {
-    // Convert class objects to strings for plist serialization
-    NSMutableArray *serializable = [NSMutableArray arrayWithCapacity:_featureConfig.count];
+    // 只保存可见性状态（key = className，value = @YES/@NO）
+    NSMutableDictionary *visibility = [NSMutableDictionary dictionaryWithCapacity:_featureConfig.count];
     for (NSDictionary *d in _featureConfig) {
-        NSMutableDictionary *sd = [NSMutableDictionary dictionary];
-        // Validate and copy only plist-safe values
-        id nameVal = d[@"name"];
-        if ([nameVal isKindOfClass:[NSString class]]) sd[@"name"] = nameVal;
-        else continue; // skip corrupted entries
-
-        id classVal = d[@"class"];
-        if (classVal) {
-            sd[@"class"] = NSStringFromClass(classVal);
-        } else continue;
-
-        id visVal = d[@"visible"];
-        sd[@"visible"] = [visVal isKindOfClass:[NSNumber class]] ? visVal : @YES;
-
-        [serializable addObject:sd];
+        NSString *className = NSStringFromClass(d[@"class"]);
+        visibility[className] = d[@"visible"] ?: @YES;
     }
-    if (serializable.count > 0) {
-        [[NSUserDefaults standardUserDefaults] setObject:serializable forKey:kPrefFeatureConfig];
-    }
+    [[NSUserDefaults standardUserDefaults] setObject:visibility forKey:kPrefFeatureConfig];
     [self rebuildFeatureArrays];
     [self.tableView reloadData];
 }
@@ -328,6 +339,36 @@ static NSString * const kPrefFeatureConfig = @"MyUltronFeatureConfig";
             [_featureClasses addObject:d[@"class"]];
         }
     }
+}
+
+/// Map feature class → SF Symbol name for sidebar icons
++ (NSString *)symbolNameForFeatureClass:(Class)cls {
+    static NSDictionary<NSString *, NSString *> *map;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        map = @{
+            @"DeviceInfoViewController":            @"info.circle",
+            @"AppListViewController":               @"list.bullet.clipboard",
+            @"DeviceScreenshotViewController":      @"camera.viewfinder",
+            @"SandboxViewController":               @"folder",
+            @"MMKVViewController":                  @"externaldrive",
+            @"UserDefaultsViewController":           @"gearshape.2",
+            @"SqliteViewController":                @"cylinder.split.1x2",
+            @"CodecViewController":                 @"arrow.left.arrow.right",
+            @"MessagePushViewController":           @"bell.badge",
+            @"NetworkMonitorViewController":        @"network",
+            @"LogMonitorViewController":            @"text.alignleft",
+            @"AnalyticsMonitorViewController":      @"chart.bar.xaxis",
+            @"IMSessionViewController":             @"message",
+            @"RouteValidationViewController":       @"checkmark.circle",
+            @"EnvironmentSwitchViewController":     @"arrow.triangle.swap",
+            @"CrashLogViewController":              @"exclamationmark.triangle",
+            @"HotfixViewController":                @"bandage",
+            @"GrayscaleTaskViewController":         @"rectangle.split.2x2",
+            @"XlogParserViewController":            @"doc.text.magnifyingglass",
+        };
+    });
+    return map[NSStringFromClass(cls)] ?: @"questionmark.circle";
 }
 
 - (void)showDeviceMenu:(NSButton *)sender {
@@ -732,6 +773,8 @@ static NSString * const kPrefFeatureConfig = @"MyUltronFeatureConfig";
 
 - (void)clientDidConnect:(MyUltronClient *)client {
     [self showToast:NSLocalizedString(@"已连接到 App", nil)];
+    self.statusIndicator.contentTintColor = [NSColor systemGreenColor];
+    self.statusIndicator.toolTip = NSLocalizedString(@"已连接", nil);
     if ([self.currentFeatureVC respondsToSelector:@selector(viewDidConnect)]) {
         [self.currentFeatureVC viewDidConnect];
     }
@@ -739,6 +782,8 @@ static NSString * const kPrefFeatureConfig = @"MyUltronFeatureConfig";
 
 - (void)clientDidDisconnect:(MyUltronClient *)client {
     [self showToast:NSLocalizedString(@"连接已断开", nil)];
+    self.statusIndicator.contentTintColor = [NSColor systemGrayColor];
+    self.statusIndicator.toolTip = NSLocalizedString(@"未连接", nil);
     if ([self.currentFeatureVC respondsToSelector:@selector(viewDidDisconnect)]) {
         [self.currentFeatureVC viewDidDisconnect];
     }
@@ -776,20 +821,36 @@ static NSString * const kPrefFeatureConfig = @"MyUltronFeatureConfig";
     if (!cell) {
         cell = [[NSTableCellView alloc] initWithFrame:NSZeroRect];
         cell.identifier = @"featureCell";
+
+        // Icon — centered vertically
+        NSImageView *icon = [[NSImageView alloc] initWithFrame:NSMakeRect(8, 0, 16, 16)];
+        icon.imageScaling = NSImageScaleProportionallyUpOrDown;
+        [cell addSubview:icon];
+        cell.imageView = icon;
+
+        // Label — centered vertically
         NSTextField *tf = [[NSTextField alloc] initWithFrame:NSZeroRect];
         tf.editable = NO; tf.bordered = NO; tf.drawsBackground = NO;
-        tf.font = [NSFont systemFontOfSize:13];
+        tf.font = [MyUltronTheme sidebarFont];
         tf.lineBreakMode = NSLineBreakByTruncatingTail;
+        tf.cell.usesSingleLineMode = YES;
         [cell addSubview:tf];
         cell.textField = tf;
     }
-    cell.textField.stringValue = self.featureItems[row];
     CGFloat rowH = tv.rowHeight;
-    cell.textField.frame = NSMakeRect(8, (rowH - 16) / 2, col.width - 16, 16);
+    cell.textField.stringValue = self.featureItems[row];
+    cell.imageView.frame = NSMakeRect(8, (rowH - 16) / 2, 16, 16);
+    cell.textField.frame = NSMakeRect(30, (rowH - 16) / 2 + 1, col.width - 38, 15);
+
+    if (@available(macOS 11.0, *)) {
+        Class cls = self.featureClasses[row];
+        NSString *symbol = [ViewController symbolNameForFeatureClass:cls];
+        cell.imageView.image = [NSImage imageWithSystemSymbolName:symbol accessibilityDescription:self.featureItems[row]];
+    }
     return cell;
 }
 
-- (CGFloat)tableView:(NSTableView *)tv heightOfRow:(NSInteger)row { return 24; }
+- (CGFloat)tableView:(NSTableView *)tv heightOfRow:(NSInteger)row { return [MyUltronTheme sidebarRowHeight]; }
 
 - (void)tableViewSelectionDidChange:(NSNotification *)notification {
     NSInteger row = self.tableView.selectedRow;
@@ -822,11 +883,11 @@ static NSString * const kPrefFeatureConfig = @"MyUltronFeatureConfig";
     NSUInteger n = editConfig.count;
     CGFloat contentH = n * rowH;
 
-    NSScrollView *sv = [[NSScrollView alloc] initWithFrame:NSMakeRect(0, 0, 310, 380)];
+    NSScrollView *sv = [[NSScrollView alloc] initWithFrame:NSMakeRect(0, 0, 280, 380)];
     sv.borderType = NSBezelBorder; sv.hasVerticalScroller = YES;
     sv.autohidesScrollers = YES;
 
-    NSView *contentView = [[NSView alloc] initWithFrame:NSMakeRect(0, 0, 290, contentH)];
+    NSView *contentView = [[NSView alloc] initWithFrame:NSMakeRect(0, 0, 260, contentH)];
 
     for (NSUInteger i = 0; i < n; i++) {
         NSDictionary *d = editConfig[i];
@@ -843,29 +904,16 @@ static NSString * const kPrefFeatureConfig = @"MyUltronFeatureConfig";
         [contentView addSubview:cb];
 
         // Name
-        NSTextField *label = [[NSTextField alloc] initWithFrame:NSMakeRect(24, y + 3, 200, 20)];
+        NSTextField *label = [[NSTextField alloc] initWithFrame:NSMakeRect(24, y + 3, 224, 20)];
         label.stringValue = d[@"name"];
         label.editable = NO; label.bordered = NO; label.drawsBackground = NO;
         label.font = [NSFont systemFontOfSize:13];
         [contentView addSubview:label];
-
-        // Move up
-        NSButton *up = [NSButton buttonWithTitle:@"▲" target:self action:@selector(settingsMoveUp:)];
-        up.frame = NSMakeRect(230, y + 3, 24, 18);
-        up.bezelStyle = NSBezelStyleSmallSquare; up.font = [NSFont systemFontOfSize:9]; up.tag = i;
-        [contentView addSubview:up];
-
-        // Move down
-        NSButton *dn = [NSButton buttonWithTitle:@"▼" target:self action:@selector(settingsMoveDown:)];
-        dn.frame = NSMakeRect(256, y + 3, 24, 18);
-        dn.bezelStyle = NSBezelStyleSmallSquare; dn.font = [NSFont systemFontOfSize:9]; dn.tag = i;
-        [contentView addSubview:dn];
     }
 
     sv.documentView = contentView;
     [contentView scrollPoint:NSMakePoint(0, contentH)];
 
-    _settingsContentView = contentView;
     _settingsEditConfig = editConfig;
 
     NSAlert *alert = [[NSAlert alloc] init];
@@ -876,9 +924,9 @@ static NSString * const kPrefFeatureConfig = @"MyUltronFeatureConfig";
     alert.accessoryView = sv;
 
     [alert beginSheetModalForWindow:self.view.window completionHandler:^(NSModalResponse code) {
-        if (code != NSAlertFirstButtonReturn) { _settingsEditConfig = nil; return; }
-        _featureConfig = editConfig;
-        _settingsEditConfig = nil;
+        if (code != NSAlertFirstButtonReturn) { self->_settingsEditConfig = nil; return; }
+        self->_featureConfig = editConfig;
+        self->_settingsEditConfig = nil;
         [self saveFeatureConfig];
     }];
 }
@@ -888,57 +936,6 @@ static NSString * const kPrefFeatureConfig = @"MyUltronFeatureConfig";
     NSInteger i = cb.tag;
     if (i < 0 || i >= (NSInteger)_settingsEditConfig.count) return;
     _settingsEditConfig[i][@"visible"] = @(cb.state == NSControlStateValueOn);
-}
-
-- (void)settingsMoveUp:(NSButton *)btn {
-    if (!_settingsEditConfig) return;
-    NSInteger i = btn.tag;
-    if (i <= 0 || i >= (NSInteger)_settingsEditConfig.count) return;
-    [_settingsEditConfig exchangeObjectAtIndex:i withObjectAtIndex:i - 1];
-    [self rebuildSettingsContent];
-}
-
-- (void)settingsMoveDown:(NSButton *)btn {
-    if (!_settingsEditConfig) return;
-    NSInteger i = btn.tag;
-    if (i < 0 || i >= (NSInteger)_settingsEditConfig.count - 1) return;
-    [_settingsEditConfig exchangeObjectAtIndex:i withObjectAtIndex:i + 1];
-    [self rebuildSettingsContent];
-}
-
-- (void)rebuildSettingsContent {
-    if (!_settingsContentView || !_settingsEditConfig) return;
-    NSView *cv = _settingsContentView;
-    NSUInteger n = _settingsEditConfig.count;
-    CGFloat rowH = 26;
-    CGFloat contentH = n * rowH;
-    cv.frame = NSMakeRect(0, 0, 290, contentH);
-
-    for (NSView *v in cv.subviews.copy) { [v removeFromSuperview]; }
-
-    for (NSUInteger i = 0; i < n; i++) {
-        NSDictionary *d = _settingsEditConfig[i];
-        CGFloat y = contentH - (i + 1) * rowH;
-
-        NSButton *cb = [[NSButton alloc] initWithFrame:NSMakeRect(4, y + 5, 16, 16)];
-        [cb setButtonType:NSButtonTypeSwitch]; cb.title = @"";
-        cb.state = [d[@"visible"] boolValue] ? NSControlStateValueOn : NSControlStateValueOff;
-        cb.tag = i; cb.target = self; cb.action = @selector(settingsCheckToggled:);
-        [cv addSubview:cb];
-
-        NSTextField *label = [[NSTextField alloc] initWithFrame:NSMakeRect(24, y + 3, 200, 20)];
-        label.stringValue = d[@"name"]; label.editable = NO; label.bordered = NO; label.drawsBackground = NO;
-        label.font = [NSFont systemFontOfSize:13];
-        [cv addSubview:label];
-
-        NSButton *up = [NSButton buttonWithTitle:@"▲" target:self action:@selector(settingsMoveUp:)];
-        up.frame = NSMakeRect(230, y + 3, 24, 18); up.bezelStyle = NSBezelStyleSmallSquare;
-        up.font = [NSFont systemFontOfSize:9]; up.tag = i; [cv addSubview:up];
-
-        NSButton *dn = [NSButton buttonWithTitle:@"▼" target:self action:@selector(settingsMoveDown:)];
-        dn.frame = NSMakeRect(256, y + 3, 24, 18); dn.bezelStyle = NSBezelStyleSmallSquare;
-        dn.font = [NSFont systemFontOfSize:9]; dn.tag = i; [cv addSubview:dn];
-    }
 }
 
 - (void)showFeatureAtIndex:(NSInteger)index {
@@ -1335,10 +1332,10 @@ typedef struct { BOOL done; NSString * __strong errMsg; } InstallCtx;
 
 - (void)setDragHighlight:(BOOL)highlight {
     if (highlight) {
-        self.containerView.layer.borderWidth = 3;
+        self.containerView.layer.borderWidth = 2;
         self.containerView.layer.borderColor = [[NSColor systemBlueColor] CGColor];
     } else {
-        self.containerView.layer.borderWidth = 1;
+        self.containerView.layer.borderWidth = 0.5;
         self.containerView.layer.borderColor = [[NSColor separatorColor] CGColor];
     }
 }

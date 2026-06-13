@@ -11,6 +11,7 @@
 #include <libimobiledevice/lockdown.h>
 #include <libimobiledevice/installation_proxy.h>
 #include <plist/plist.h>
+#import "MyUltronTheme.h"
 
 @interface AppListViewController () <NSTableViewDataSource, NSTableViewDelegate>
 
@@ -51,8 +52,8 @@
     _statusLabel.bordered = NO;
     _statusLabel.selectable = NO;
     _statusLabel.backgroundColor = [NSColor clearColor];
-    _statusLabel.textColor = [NSColor secondaryLabelColor];
-    _statusLabel.font = [NSFont systemFontOfSize:12];
+    _statusLabel.textColor = [MyUltronTheme statusColor];
+    _statusLabel.font = [MyUltronTheme statusFont];
     _statusLabel.stringValue = NSLocalizedString(@"正在加载应用列表…", nil);
     _statusLabel.translatesAutoresizingMaskIntoConstraints = NO;
     [self.view addSubview:_statusLabel];
@@ -290,24 +291,21 @@
     NSString *colID = tableColumn.identifier;
     if ([colID isEqualToString:@"name"]) {
         cell.textField.stringValue = rowData[@"name"];
-        cell.textField.font = [NSFont boldSystemFontOfSize:12];
+        cell.textField.font = [MyUltronTheme tableBoldFont];
     } else if ([colID isEqualToString:@"bundleID"]) {
         cell.textField.stringValue = rowData[@"bundleID"];
-        cell.textField.font = [NSFont monospacedSystemFontOfSize:11 weight:NSFontWeightRegular];
+        cell.textField.font = [MyUltronTheme monospacedFont];
     } else {
         cell.textField.stringValue = rowData[@"version"];
-        cell.textField.font = [NSFont systemFontOfSize:12];
+        cell.textField.font = [MyUltronTheme tableFont];
     }
 
-    CGFloat rowH = tableView.rowHeight;
-    cell.textField.frame = NSMakeRect(4, (rowH - 16) / 2, tableColumn.width - 8, 16);
+    cell.textField.frame = NSMakeRect(6, (tableView.rowHeight - 16) / 2, tableColumn.width - 12, 16);
     return cell;
 }
 
-#pragma mark - NSTableViewDelegate
-
 - (CGFloat)tableView:(NSTableView *)tableView heightOfRow:(NSInteger)row {
-    return 28;
+    return [MyUltronTheme tableRowHeight];
 }
 
 @end

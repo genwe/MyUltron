@@ -8,6 +8,7 @@
 #import "NetworkMonitorViewController.h"
 #import "../ViewController.h"
 #import "../Core/MyUltronClient.h"
+#import "MyUltronTheme.h"
 @import SQLite3;
 
 static NSString * const kMsgVersion = @"version";
@@ -234,8 +235,8 @@ static NSString * const kMsgContent = @"content";
     _statusLabel = [[NSTextField alloc] initWithFrame:NSZeroRect];
     _statusLabel.editable = NO; _statusLabel.bordered = NO; _statusLabel.selectable = NO;
     _statusLabel.backgroundColor = [NSColor clearColor];
-    _statusLabel.textColor = [NSColor secondaryLabelColor];
-    _statusLabel.font = [NSFont systemFontOfSize:11];
+    _statusLabel.textColor = [MyUltronTheme statusColor];
+    _statusLabel.font = [MyUltronTheme statusFont];
     _statusLabel.stringValue = NSLocalizedString(@"正在检测连接…", nil);
     _statusLabel.translatesAutoresizingMaskIntoConstraints = NO;
     [self.view addSubview:_statusLabel];
@@ -271,7 +272,7 @@ static NSString * const kMsgContent = @"content";
     _detailLabel.stringValue = NSLocalizedString(@"请求详情：", nil);
     _detailLabel.editable = NO; _detailLabel.bordered = NO; _detailLabel.selectable = NO;
     _detailLabel.backgroundColor = [NSColor clearColor];
-    _detailLabel.font = [NSFont boldSystemFontOfSize:11];
+    _detailLabel.font = [MyUltronTheme tableBoldFont];
     _detailLabel.translatesAutoresizingMaskIntoConstraints = NO;
     [self.view addSubview:_detailLabel];
 
@@ -289,7 +290,7 @@ static NSString * const kMsgContent = @"content";
 
     _detailTextView = [[NSTextView alloc] initWithFrame:NSZeroRect];
     _detailTextView.editable = NO;
-    _detailTextView.font = [NSFont monospacedSystemFontOfSize:10 weight:NSFontWeightRegular];
+    _detailTextView.font = [MyUltronTheme monospacedFont];
     _detailTextView.backgroundColor = [NSColor textBackgroundColor];
     _detailTextView.textColor = [NSColor textColor];
     _detailScrollView.documentView = _detailTextView;
@@ -637,8 +638,14 @@ static NSString * const kMsgContent = @"content";
 
     if ([cid isEqualToString:@"ml_on"]) {
         NSButton *btn = [_mockListTable makeViewWithIdentifier:cid owner:self];
-        if (!btn) { btn = [[NSButton alloc] initWithFrame:NSZeroRect]; btn.title = @""; btn.bezelStyle = NSBezelStyleRegularSquare; btn.bordered = NO; btn.identifier = cid; }
-        btn.tag = row; btn.title = [r[@"enabled"] boolValue] ? @"✅" : @"⬜";
+        if (!btn) {
+            btn = [[NSButton alloc] initWithFrame:NSZeroRect];
+            btn.title = @"";
+            [btn setButtonType:NSButtonTypeSwitch];
+            btn.identifier = cid;
+        }
+        btn.tag = row;
+        btn.state = [r[@"enabled"] boolValue] ? NSControlStateValueOn : NSControlStateValueOff;
         btn.target = self; btn.action = @selector(toggleMockFromListWindow:);
         return btn;
     }
@@ -656,7 +663,7 @@ static NSString * const kMsgContent = @"content";
         cell = [[NSTableCellView alloc] initWithFrame:NSZeroRect];
         NSTextField *tf = [[NSTextField alloc] initWithFrame:NSZeroRect];
         tf.editable = NO; tf.bordered = NO; tf.selectable = NO;
-        tf.backgroundColor = [NSColor clearColor]; tf.font = [NSFont systemFontOfSize:11];
+        tf.backgroundColor = [NSColor clearColor]; tf.font = [MyUltronTheme statusFont];
         tf.lineBreakMode = NSLineBreakByTruncatingTail;
         cell.textField = tf; [cell addSubview:tf];
         tf.translatesAutoresizingMaskIntoConstraints = NO;

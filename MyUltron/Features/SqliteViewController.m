@@ -8,6 +8,7 @@
 #import "SqliteViewController.h"
 #import "../Core/MyUltronClient.h"
 #import "../ViewController.h"
+#import "MyUltronTheme.h"
 
 @interface SqliteViewController () <NSTableViewDataSource, NSTableViewDelegate>
 
@@ -69,28 +70,34 @@
     _tableSelector.autoresizingMask = NSViewMaxXMargin | NSViewMinYMargin;
     [self.view addSubview:_tableSelector];
 
-    _refreshBtn = [NSButton buttonWithTitle:@"刷新" target:self action:@selector(refreshData:)];
-    _refreshBtn.frame = NSMakeRect(404, y, 70, 26);
-    _refreshBtn.bezelStyle = NSBezelStyleRounded;
+    _refreshBtn = [MyUltronTheme symbolButton:@"arrow.clockwise"
+                                      tooltip:NSLocalizedString(@"刷新", nil)
+                                       target:self
+                                       action:@selector(refreshData:)];
+    _refreshBtn.frame = NSMakeRect(404, y, 36, 26);
     _refreshBtn.autoresizingMask = NSViewMaxXMargin | NSViewMinYMargin;
     [self.view addSubview:_refreshBtn];
 
-    _addRowBtn = [NSButton buttonWithTitle:@"+ 行" target:self action:@selector(addRow:)];
-    _addRowBtn.frame = NSMakeRect(480, y, 60, 26);
-    _addRowBtn.bezelStyle = NSBezelStyleRounded;
+    _addRowBtn = [MyUltronTheme symbolButton:@"plus"
+                                     tooltip:NSLocalizedString(@"新增行", nil)
+                                      target:self
+                                      action:@selector(addRow:)];
+    _addRowBtn.frame = NSMakeRect(446, y, 36, 26);
     _addRowBtn.autoresizingMask = NSViewMaxXMargin | NSViewMinYMargin;
     [self.view addSubview:_addRowBtn];
 
-    _deleteRowBtn = [NSButton buttonWithTitle:@"- 行" target:self action:@selector(deleteRow:)];
-    _deleteRowBtn.frame = NSMakeRect(546, y, 60, 26);
-    _deleteRowBtn.bezelStyle = NSBezelStyleRounded;
+    _deleteRowBtn = [MyUltronTheme symbolButton:@"minus"
+                                        tooltip:NSLocalizedString(@"删除行", nil)
+                                         target:self
+                                         action:@selector(deleteRow:)];
+    _deleteRowBtn.frame = NSMakeRect(488, y, 36, 26);
     _deleteRowBtn.autoresizingMask = NSViewMaxXMargin | NSViewMinYMargin;
     [self.view addSubview:_deleteRowBtn];
 
     _statusLabel = [[NSTextField alloc] initWithFrame:NSMakeRect(8, 8, 400, 18)];
     _statusLabel.editable = NO; _statusLabel.bordered = NO; _statusLabel.drawsBackground = NO;
-    _statusLabel.textColor = [NSColor secondaryLabelColor];
-    _statusLabel.font = [NSFont systemFontOfSize:11];
+    _statusLabel.textColor = [MyUltronTheme statusColor];
+    _statusLabel.font = [MyUltronTheme statusFont];
     _statusLabel.stringValue = NSLocalizedString(@"请先连接设备并选择数据库", nil);
     _statusLabel.autoresizingMask = NSViewMaxXMargin | NSViewMaxYMargin;
     [self.view addSubview:_statusLabel];
