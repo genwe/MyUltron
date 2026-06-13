@@ -23,6 +23,8 @@
 #import "Core/MyUltronClient.h"
 #import "Features/FeatureViewController.h"
 #import "Features/MyUltronTheme.h"
+#import "Core/MyUltronMCPSocketServer.h"
+#import "Core/MyUltronMCPServer.h"
 
 #include <libimobiledevice/libimobiledevice.h>
 #include <libimobiledevice/lockdown.h>
@@ -94,6 +96,11 @@ static NSString * const kPrefFeatureConfig = @"MyUltronFeatureConfig";
 @property (nonatomic, strong) NSVisualEffectView *toolbarView;
 @property (nonatomic, strong) NSImageView *statusIndicator;
 
+// MCP
+@property (nonatomic, strong) NSButton *mcpToggleButton;
+@property (nonatomic, strong) NSImageView *mcpStatusDot;
+@property (nonatomic, strong) MyUltronMCPSocketServer *mcpServer;
+
 // Settings
 @property (nonatomic, strong) NSButton *settingsButton;
 @property (nonatomic, strong) NSMutableArray<NSMutableDictionary *> *featureConfig;
@@ -145,25 +152,45 @@ static NSString * const kPrefFeatureConfig = @"MyUltronFeatureConfig";
     toolbarSeparator.autoresizingMask = NSViewWidthSizable | NSViewMaxYMargin;
     [self.toolbarView addSubview:toolbarSeparator];
 
-    // Device button
-    self.deviceButton = [MyUltronTheme buttonWithTitle:NSLocalizedString(@"连接设备", nil) target:self action:@selector(showDeviceMenu:)];
+    // Device button (frame-based layout, no Auto Layout)
+    self.deviceButton = [NSButton buttonWithTitle:NSLocalizedString(@"连接设备", nil) target:self action:@selector(showDeviceMenu:)];
+    self.deviceButton.bezelStyle = NSBezelStyleRounded;
     self.deviceButton.frame = NSMakeRect(12, (toolbarHeight - 32) / 2, 140, 32);
     self.deviceButton.autoresizingMask = NSViewMaxXMargin;
     [self.toolbarView addSubview:self.deviceButton];
 
-    // App button
-    self.appButton = [MyUltronTheme buttonWithTitle:NSLocalizedString(@"选择App", nil) target:self action:@selector(showAppMenu:)];
-    self.appButton.frame = NSMakeRect(160, (toolbarHeight - 32) / 2, 140, 32);
+    // App button (frame-based layout, no Auto Layout)
+    self.appButton = [NSButton buttonWithTitle:NSLocalizedString(@"选择App", nil) target:self action:@selector(showAppMenu:)];
+    self.appButton.bezelStyle = NSBezelStyleRounded;
+    self.appButton.frame = NSMakeRect(164, (toolbarHeight - 32) / 2, 140, 32);
     self.appButton.autoresizingMask = NSViewMaxXMargin;
     [self.toolbarView addSubview:self.appButton];
 
-    // Connection status indicator (green/gray dot)
-    self.statusIndicator = [[NSImageView alloc] initWithFrame:NSMakeRect(viewW - 78, (toolbarHeight - 12) / 2, 12, 12)];
-    self.statusIndicator.autoresizingMask = NSViewMinXMargin;
+    // Connection status indicator (green/gray dot) — placed after app button
+    self.statusIndicator = [[NSImageView alloc] initWithFrame:NSMakeRect(308, (toolbarHeight - 12) / 2, 12, 12)];
+    self.statusIndicator.autoresizingMask = NSViewMaxXMargin;
     self.statusIndicator.image = [NSImage imageWithSystemSymbolName:@"circle.fill" accessibilityDescription:@"Disconnected"];
     self.statusIndicator.contentTintColor = [NSColor systemGrayColor];
     self.statusIndicator.toolTip = NSLocalizedString(@"未连接", nil);
     [self.toolbarView addSubview:self.statusIndicator];
+
+    // MCP toggle button (right side, auto-width)
+    self.mcpToggleButton = [NSButton buttonWithTitle:@"MCP" target:self action:@selector(toggleMCPServer:)];
+    self.mcpToggleButton.font = [NSFont systemFontOfSize:13];
+    CGFloat mcpW = MAX(56, [@"MCP" sizeWithAttributes:@{NSFontAttributeName: self.mcpToggleButton.font}].width + 20);
+    self.mcpToggleButton.frame = NSMakeRect(viewW - 60 - mcpW - 16, (toolbarHeight - 26) / 2, mcpW, 26);
+    self.mcpToggleButton.bezelStyle = NSBezelStyleRounded;
+    self.mcpToggleButton.autoresizingMask = NSViewMinXMargin;
+    self.mcpToggleButton.toolTip = NSLocalizedString(@"启动 MCP 服务供 Claude Code 连接", nil);
+    [self.toolbarView addSubview:self.mcpToggleButton];
+
+    // MCP status dot (hidden until MCP is running)
+    self.mcpStatusDot = [[NSImageView alloc] initWithFrame:NSMakeRect(0, (toolbarHeight - 10) / 2, 10, 10)];
+    self.mcpStatusDot.autoresizingMask = NSViewMinXMargin;
+    self.mcpStatusDot.image = [NSImage imageWithSystemSymbolName:@"circle.fill" accessibilityDescription:@"MCP"];
+    self.mcpStatusDot.contentTintColor = [NSColor systemGreenColor];
+    self.mcpStatusDot.hidden = YES;
+    [self.toolbarView addSubview:self.mcpStatusDot];
 
     // Settings gear button (top-right)
     self.settingsButton = [[NSButton alloc] initWithFrame:NSMakeRect(viewW - 60, (toolbarHeight - 28) / 2, 32, 28)];
@@ -471,6 +498,7 @@ static NSString * const kPrefFeatureConfig = @"MyUltronFeatureConfig";
     self.selectedIsSimulator = [info[@"simulator"] boolValue];
     self.appButton.title = NSLocalizedString(NSLocalizedString(NSLocalizedString(@"请选择应用", nil), nil), nil);
     self.selectedAppBundleID = nil;
+    [self repositionStatusIndicator];
 }
 
 - (void)showAppMenu:(NSButton *)sender {
@@ -545,6 +573,8 @@ static NSString * const kPrefFeatureConfig = @"MyUltronFeatureConfig";
 
     // Launch the app
     [self launchApp:bundleID onDevice:self.selectedUDID isSimulator:self.selectedIsSimulator];
+
+    [self repositionStatusIndicator];
 
     // Then connect to MyUltronServer running inside the app
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.0 * NSEC_PER_SEC)),
@@ -775,6 +805,10 @@ static NSString * const kPrefFeatureConfig = @"MyUltronFeatureConfig";
     [self showToast:NSLocalizedString(@"已连接到 App", nil)];
     self.statusIndicator.contentTintColor = [NSColor systemGreenColor];
     self.statusIndicator.toolTip = NSLocalizedString(@"已连接", nil);
+
+    // Share the TCP connection with MCP server
+    [MyUltronMCPServer sharedInstance].sharedClient = client;
+
     if ([self.currentFeatureVC respondsToSelector:@selector(viewDidConnect)]) {
         [self.currentFeatureVC viewDidConnect];
     }
@@ -784,6 +818,9 @@ static NSString * const kPrefFeatureConfig = @"MyUltronFeatureConfig";
     [self showToast:NSLocalizedString(@"连接已断开", nil)];
     self.statusIndicator.contentTintColor = [NSColor systemGrayColor];
     self.statusIndicator.toolTip = NSLocalizedString(@"未连接", nil);
+
+    [MyUltronMCPServer sharedInstance].sharedClient = nil;
+
     if ([self.currentFeatureVC respondsToSelector:@selector(viewDidDisconnect)]) {
         [self.currentFeatureVC viewDidDisconnect];
     }
@@ -793,12 +830,18 @@ static NSString * const kPrefFeatureConfig = @"MyUltronFeatureConfig";
     NSString *type = dict[@"messageType"];
     NSLog(@"[MyUltron] ← messageType: %@", type);
 
+    // Forward to MCP server for request/response matching
+    [[MyUltronMCPServer sharedInstance] handleIncomingMessage:dict];
+
     if ([self.currentFeatureVC respondsToSelector:@selector(didReceiveMessage:)]) {
         [self.currentFeatureVC didReceiveMessage:dict];
     }
 }
 
 - (void)client:(MyUltronClient *)client didReceiveBinaryData:(NSData *)data {
+    // Forward to MCP server for binary response matching
+    [[MyUltronMCPServer sharedInstance] handleIncomingBinary:data];
+
     if ([self.currentFeatureVC respondsToSelector:@selector(didReceiveBinaryData:)]) {
         [self.currentFeatureVC performSelector:@selector(didReceiveBinaryData:)
                                     withObject:data];
@@ -869,6 +912,50 @@ static NSString * const kPrefFeatureConfig = @"MyUltronFeatureConfig";
 
     NSLog(@"[Ultron] 选中功能: %@", self.featureItems[row]);
     [self showFeatureAtIndex:row];
+}
+
+- (void)repositionStatusIndicator {
+    CGFloat x = NSMaxX(self.appButton.frame) + 8;
+    NSRect f = self.statusIndicator.frame;
+    f.origin.x = x;
+    self.statusIndicator.frame = f;
+}
+
+#pragma mark - MCP Server
+
+- (void)toggleMCPServer:(NSButton *)sender {
+    if (self.mcpServer.isRunning) {
+        [self.mcpServer stop];
+        self.mcpServer = nil;
+        self.mcpToggleButton.title = @"MCP";
+        self.mcpToggleButton.toolTip = NSLocalizedString(@"启动 MCP 服务供 Claude Code 连接", nil);
+        self.mcpStatusDot.hidden = YES;
+        [self showToast:NSLocalizedString(@"MCP 服务已关闭", nil)];
+    } else {
+        if (!self.mcpServer) {
+            self.mcpServer = [[MyUltronMCPSocketServer alloc] init];
+        }
+        NSString *err = nil;
+        if ([self.mcpServer startWithPort:9021 error:&err]) {
+            self.mcpToggleButton.title = @"MCP";
+            self.mcpToggleButton.toolTip = [NSString stringWithFormat:@"MCP 运行中 — localhost:%u\nClaude Code: nc localhost %u", self.mcpServer.port, self.mcpServer.port];
+            self.mcpStatusDot.hidden = NO;
+            [self showToast:[NSString stringWithFormat:NSLocalizedString(@"MCP 已启动 → localhost:%u", nil), self.mcpServer.port]];
+        } else {
+            [self showToast:[NSString stringWithFormat:NSLocalizedString(@"MCP 启动失败: %@", nil), err ?: @"unknown"]];
+        }
+    }
+    // Resize button and position dot
+    CGFloat textW = [self.mcpToggleButton.title sizeWithAttributes:@{NSFontAttributeName: self.mcpToggleButton.font}].width;
+    CGFloat w = MAX(56, textW + 20);
+    NSRect f = self.mcpToggleButton.frame;
+    f.origin.x = NSMaxX(f) - w;
+    f.size.width = w;
+    self.mcpToggleButton.frame = f;
+    // Position green dot to the right of button
+    NSRect dotF = self.mcpStatusDot.frame;
+    dotF.origin.x = NSMaxX(f) + 6;
+    self.mcpStatusDot.frame = dotF;
 }
 
 #pragma mark - Settings Dialog

@@ -39,7 +39,50 @@ iOS debugging desktop client. Connects to the MyUltronServer embedded in an iOS 
 
 ## Sidebar Customization
 
-Feature modules can be shown/hidden and reordered via drag-and-drop. Settings are persisted in NSUserDefaults.
+Feature modules can be shown/hidden. Settings are persisted in NSUserDefaults.
+
+## MCP (Model Context Protocol)
+
+MyUltron can expose its debugging tools as an MCP server, enabling AI assistants like **Claude Code** to interact directly with iOS devices — taking screenshots, reading sandbox files, querying databases, and more.
+
+### Enabling MCP
+
+1. In the MyUltron app, connect to a device and select an app (TCP status turns green)
+2. Click the **MCP** button in the toolbar — a green dot appears when the server is running on `localhost:9021`
+
+### Connecting from Claude Code
+
+```bash
+claude mcp add --scope project myultron nc localhost 9021
+```
+
+This writes a `.mcp.json` config file to your project root, which can be committed to git.
+
+### Available MCP Tools
+
+| Tool | Description | Requires App |
+|------|-------------|:---:|
+| `list_devices` | List connected iOS devices and booted simulators | No |
+| `device_info` | Get detailed device information | No |
+| `list_apps` | List installed apps on the device | No |
+| `take_screenshot` | Take a screenshot and save to `~/Desktop/` | Yes |
+| `list_sandbox_dir` | List sandbox directory contents | Yes |
+| `read_sandbox_file` | Read a file from the sandbox | Yes |
+| `delete_sandbox_file` | Delete a file or directory from the sandbox | Yes |
+| `list_user_defaults` | List all NSUserDefaults keys | Yes |
+| `get_user_default` | Get a specific UserDefaults value | Yes |
+| `set_user_default` | Set a UserDefaults value | Yes |
+| `delete_user_default` | Delete a UserDefaults key | Yes |
+| `list_sqlite_dbs` | List SQLite databases in the sandbox | Yes |
+| `list_sqlite_tables` | List tables in a database | Yes |
+| `query_sqlite` | Query data from a table | Yes |
+| `send_push` | Send a simulated push notification | Yes |
+| `list_network_requests` | List captured network requests | Yes |
+| `url_encode` | URL-encode a string | No |
+| `url_decode` | URL-decode a string | No |
+| `base64_encode` | Base64-encode a string | No |
+| `base64_decode` | Base64-decode a string | No |
+| `md5_hash` | Compute MD5 hash of a string | No |
 
 ## Requirements
 

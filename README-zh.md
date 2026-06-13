@@ -39,7 +39,50 @@ iOS 调试工具桌面客户端。通过 USB 或模拟器连接到 iOS 应用中
 
 ## 侧边栏自定义
 
-功能模块可显示/隐藏、拖拽调整顺序，设置通过 NSUserDefaults 持久化。
+功能模块可显示/隐藏，设置通过 NSUserDefaults 持久化。
+
+## MCP（模型上下文协议）
+
+MyUltron 可将调试工具暴露为 MCP 服务器，让 **Claude Code** 等 AI 助手直接与 iOS 设备交互——截屏、读取沙盒文件、查询数据库等。
+
+### 启用 MCP
+
+1. 在 MyUltron App 中连接设备并选择 App（TCP 状态灯变绿）
+2. 点击工具栏 **MCP** 按钮 — 启动成功后右侧出现绿色圆点，服务运行在 `localhost:9021`
+
+### 在 Claude Code 中连接
+
+```bash
+claude mcp add --scope project myultron nc localhost 9021
+```
+
+这会在项目根目录生成 `.mcp.json` 配置文件，可随 git 提交。
+
+### 可用 MCP 工具
+
+| 工具 | 说明 | 需要 App |
+|------|------|:---:|
+| `list_devices` | 列出已连接的 iOS 设备和模拟器 | 否 |
+| `device_info` | 获取设备详细信息 | 否 |
+| `list_apps` | 列出设备上已安装的应用 | 否 |
+| `take_screenshot` | 截屏并保存到 `~/Desktop/` | 是 |
+| `list_sandbox_dir` | 列出沙盒目录内容 | 是 |
+| `read_sandbox_file` | 读取沙盒中的文件 | 是 |
+| `delete_sandbox_file` | 删除沙盒中的文件或目录 | 是 |
+| `list_user_defaults` | 列出所有 NSUserDefaults 键 | 是 |
+| `get_user_default` | 获取指定 UserDefaults 值 | 是 |
+| `set_user_default` | 设置 UserDefaults 值 | 是 |
+| `delete_user_default` | 删除 UserDefaults 键 | 是 |
+| `list_sqlite_dbs` | 列出沙盒中的 SQLite 数据库 | 是 |
+| `list_sqlite_tables` | 列出数据库中的表 | 是 |
+| `query_sqlite` | 查询表中的数据 | 是 |
+| `send_push` | 发送模拟推送通知 | 是 |
+| `list_network_requests` | 列出捕获的网络请求 | 是 |
+| `url_encode` | URL 编码字符串 | 否 |
+| `url_decode` | URL 解码字符串 | 否 |
+| `base64_encode` | Base64 编码字符串 | 否 |
+| `base64_decode` | Base64 解码字符串 | 否 |
+| `md5_hash` | 计算字符串的 MD5 哈希 | 否 |
 
 ## 系统要求
 
